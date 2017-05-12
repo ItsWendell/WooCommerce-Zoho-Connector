@@ -1,0 +1,19 @@
+{
+  "name": "digispark/woocommerce-zoho-connector",
+  "description": "WordPress WooCommerce Connector",
+  "keywords": ["wordpress", "zoho", "woocommerce", "connector"],
+  "homepage": "https://digispark.nl",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Wendell Misiedjan",
+      "email": "me@wmisiedjan.net",
+      "homepage": "https://digispark.nl/wmisiedjan"
+    }
+  ],
+  "type": "wordpress-plugin",
+  "require": {
+    "php": ">=5.3.2",
+    "composer/installers": "v1.0.6"
+  }
+}
