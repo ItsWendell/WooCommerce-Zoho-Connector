@@ -1,9 +1,10 @@
 # WooCommerce-Zoho-Connector
 A connector for WooCommerce To Zoho for Sales Orders
 
-# Roadmap v0.1
- - Initial Connector for 1 way Sales Orders from WooCommerce to Zoho.
- - - Support for auto-matching clients in database of Zoho based on email adress or company name.
+# Roadmap v0.1 BETA
+Initial connector for 1 way multi-store, multi-site WooCommerce Sales Order To Zoho Sales Orders Connector.
+ - Zoho Sales Order: Matching Clients Based on Emails.
+ - Zoho Sales Order: Matching Products Based On EAN / Product Codes
  
  # Notes
- I'm building this plugin since a lot of connectors available are monthly subscribtions.
+ More features / roadmap comming soon!
