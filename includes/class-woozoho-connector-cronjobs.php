@@ -28,22 +28,62 @@ class Woozoho_Connector_Cronjobs {
 *
 * @since    1.0.0
 */
-public function setup() {
-	add_action('woozoho_orders_event', 'woozoho_orders_event');
+
+	/**
+	 * The unique identifier of the client
+	 *
+	 * @since    1.0.0
+	 * @access   protected
+	 * @var      ZohoConnector $client The string used to uniquely identify this plugin.
+	 */
+	protected $client;
+
+	/**
+	 * Initialize the collections used to maintain the actions and filters.
+	 *
+	 * @since    1.0.0
+	 * @var
+	 */
+	public function __construct( $client ) {
+		//Define jobs
+		$this->client = $client;
 }
 
-public function setup_orders()
+	public function setupOrdersJob() {
+		$recurrence = WC_Admin_Settings::get_option( "wc_zoho_connector_cron_orders_recurrence" );
+		$this->client->writeDebug( "Cron Jobs", "Setting up cron job for Orders on a " . $recurrence . " basis..." );
+		wp_schedule_event( time(), $recurrence, 'woozoho_orders_job' );
+		$this->client->writeDebug( "Cron Jobs", "Cron job is successfully setup." );
+}
+
+	public function isOrdersJobRunning()
 {
-	if (! wp_next_scheduled ( 'woozoho_orders_job' )) {
-		wp_schedule_event(time(), WC_Admin_Settings::get_option("wc_zoho_connector_cron_orders_recurrence"), 'woozoho_orders_event');
+	return wp_next_scheduled( 'woozoho_orders_job' );
+}
+
+	public function updateOrdersJob( $recurrence ) {
+		$oldRecurrence = wp_get_schedule( 'woozoho_orders_job' );
+		if ( $recurrence != $oldRecurrence ) {
+			$this->client->writeDebug( "Cron Jobs", "Changing cronjob from " . $oldRecurrence . " to " . $recurrence );
+			$nextTime = wp_next_scheduled( 'woozoho_orders_job' );
+			wp_unschedule_event( $nextTime, 'woozoho_orders_job' );
+			if ( ! $this->isOrdersJobRunning() ) {
+				$this->setupOrdersJob();
+			} else {
+				$this->client->writeDebug( "Cron Jobs", "Error, job was still running! Cant change " . $oldRecurrence . " to " . $recurrence );
+			}
+		}
+}
+
+	public function runOrdersJob() {
+		$this->client->writeDebug( "Cron Jobs", "Running orders cron job..." );
+		$ordersQueue = $this->client->getOrdersQueue()->getQueue();
+
+		foreach ( $ordersQueue as $order_id ) {
+			$this->client->writeDebug( "Cron Jobs", "Pushing Order ID: " . $order_id );
+			$this->client->pushOrder( $order_id );
+		}
+		//$core->pushOrder($order_id);
 	}
-}
-
-public function woozoho_orders_event()
-{
-
-}
-
-
 
 }

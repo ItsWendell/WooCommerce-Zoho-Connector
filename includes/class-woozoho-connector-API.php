@@ -517,8 +517,8 @@ class ZohoClient
 
         //MORE CRAP
 	    curl_setopt($this->_curlObject, CURLOPT_AUTOREFERER, true);
-        curl_setopt($this->_curlObject, CURLAUTH_ANY, true);
-        curl_setopt($this->_curlObject, CURLAUTH_ANYSAFE, true);
+	    //curl_setopt($this->_curlObject, CURLAUTH_ANY, true);
+	    //curl_setopt($this->_curlObject, CURLAUTH_ANYSAFE, true);
 
 	    curl_setopt($this->_curlObject, CURLOPT_SSL_VERIFYPEER, FALSE);
 	    curl_setopt($this->_curlObject, CURLOPT_SSL_VERIFYHOST, FALSE);

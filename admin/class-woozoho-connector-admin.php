@@ -40,21 +40,21 @@ class Woozoho_Connector_Admin {
 	 */
 	private $version;
 
-	public $zoho_client;
+	private $client;
 
 	/**
 	 * Initialize the class and set its properties.
 	 *
 	 * @since    1.0.0
+	 *
 	 * @param      string    $plugin_name       The name of this plugin.
 	 * @param      string    $version    The version of this plugin.
+	 * @param      ZohoConnector $client Client for the core of Zoho Connector.
 	 */
-	public function __construct( $plugin_name, $version, $core ) {
-
+	public function __construct( $plugin_name, $version, $client ) {
 		$this->plugin_name = $plugin_name;
 		$this->version = $version;
-		$this->zoho_client = new ZohoConnector();
-
+		$this->client      = $client;
 	}
 
 	/**
@@ -111,6 +111,7 @@ class Woozoho_Connector_Admin {
 	}
 
 	//WooCommerce Settings Tab Functionality
+	//TODO: Add tutorial on how to make cron work better within WordPress.
 	public function woocommerce_add_settings_tab($settings_tabs)
 	{
 		$settings_tabs['zoho_connector'] = __( 'Zoho Connector', 'woozoho-connector');
@@ -122,25 +123,30 @@ class Woozoho_Connector_Admin {
 	}
 
 	public static function woocommerce_update_settings() {
-		ZohoConnector::writeDebug("Settings", "Settings updated!");
+		$oldOrderRecurrence = WC_Admin_Settings::get_option( "wc_zoho_connector_cron_orders_recurrence" );
+		//ZohoConnector::writeDebug("Settings", "Settings updated!");
 		woocommerce_update_options( self::get_settings() );
+		if ( $oldOrderRecurrence != WC_Admin_Settings::get_option( "wc_zoho_connector_cron_orders_recurrence" ) ) {
+			$cronJobs = new Woozoho_Connector_Cronjobs( new ZohoConnector() );
+			$cronJobs->updateOrdersJob( WC_Admin_Settings::get_option( "wc_zoho_connector_cron_orders_recurrence" ) );
+		}
 	}
 
 	public static function get_settings() {
 		$settings = array(
-			'section_title' => array(
+			'section_title'          => array(
 				'name'     => __( 'Zoho Connector Settings', 'woozoho-connector' ),
 				'type'     => 'title',
 				'desc'     => '',
 				'id'       => 'wc_zoho_connector_section_title'
 			),
-			'token' => array(
+			'token'                  => array(
 				'name' => __( 'Auth Token', 'woozoho-connector' ),
 				'type' => 'text',
 				'desc' => __( 'Generate a auth code here.', 'woozoho-connector' ),
 				'id'   => 'wc_zoho_connector_token'
 			),
-			'organisation_id' => array(
+			'organisation_id'        => array(
 				'name' => __( 'Organisation Id', 'woozoho-connector' ),
 				'type' => 'text',
 				'desc' => __( 'Find your organisation id here.', 'woozoho-connector' ),
@@ -152,13 +158,13 @@ class Woozoho_Connector_Admin {
 				'desc' => __( 'Email where notifications and logs from synchronizing are sent too.', 'woozoho-connector' ),
 				'id'   => 'wc_zoho_connector_notify_email'
 			),
-			'debugging' => array(
+			'debugging'              => array(
 				'name' => __( 'Debugging', 'woozoho-connector' ),
 				'type' => 'checkbox',
 				'desc' => __( 'Enable debugging in logfile?', 'woozoho-connector' ),
 				'id'   => 'wc_zoho_connector_debugging'
 			),
-			'testmode' => array(
+			'testmode'               => array(
 				'name' => __( 'Test mode', 'woozoho-connector' ),
 				'type' => 'checkbox',
 				'desc' => __( 'Enable testmode?', 'woozoho-connector' ),
@@ -168,13 +174,21 @@ class Woozoho_Connector_Admin {
 				'name' => __( 'Syncing Orders', 'woozoho-connector' ),
 				'type' => 'select',
 				'options' => array(
+					'directly'   => __( 'Directly', 'woozoho-connector' ),
 					'hourly' => __( 'Hourly', 'woozoho-connector' ),
 					'twicedaily' => __( 'Twice Daily', 'woozoho-connector' ),
 					'daily' => __( 'Daily', 'woozoho-connector' )),
 				'desc' => __( 'How often should orders be synced?', 'woozoho-connector' ),
 				'id'   => 'wc_zoho_connector_cron_orders_recurrence'
 			),
-			'section_end' => array(
+			'orders_queue_max_tries' => array(
+				'name'    => __( 'Orders Queue Max Tries', 'woozoho-connector' ),
+				'type'    => 'text',
+				'default' => '3',
+				'desc'    => __( 'How often should we try to push orders?', 'woozoho-connector' ),
+				'id'      => 'wc_zoho_connector_orders_queue_max_tries'
+			),
+			'section_end'            => array(
 				'type' => 'sectionend',
 				'id' => 'wc_zoho_connector_section_end'
 			)
@@ -182,14 +196,4 @@ class Woozoho_Connector_Admin {
 		return apply_filters( 'wc_zoho_connector_settings', $settings );
 	}
 	//END
-
-	//Cron Jobs
-
-	public function zoho_connector_orders_job()
-	{
-
-	}
-
-
-
 }

@@ -79,6 +79,7 @@ class Woozoho_Connector {
 		$this->core = new ZohoConnector();
 		$this->define_admin_hooks();
 		$this->define_public_hooks();
+		$this->define_cron_jobs();
 	}
 
 	public function core()
@@ -122,7 +123,11 @@ class Woozoho_Connector {
 		//ZohoConnector Core Functionality
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-woozoho-connector-API.php';
 
+		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-woozoho-connector-orders-queue.php';
+
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-woozoho-connector-core.php';
+
+		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-woozoho-connector-cronjobs.php';
 
 		/**
 		 * The class responsible for defining all actions that occur in the admin area.
@@ -134,8 +139,6 @@ class Woozoho_Connector {
 		 * side of the site.
 		 */
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'public/class-woozoho-connector-public.php';
-
-
 
 
 		$this->loader = new Woozoho_Connector_Loader();
@@ -180,7 +183,6 @@ class Woozoho_Connector {
 
 		$plugin_basename = plugin_basename( plugin_dir_path( __DIR__ ) . $this->plugin_name . '.php' );
 		$this->loader->add_filter( 'plugin_action_links_' . $plugin_basename, $plugin_admin, 'add_action_links' );
-
 	}
 
 	/**
@@ -198,13 +200,27 @@ class Woozoho_Connector {
 		$this->loader->add_action( 'wp_enqueue_scripts', $plugin_public, 'enqueue_scripts' );
 
 		//Queue orders for synchronisation to Zoho.
-		$this->loader->add_action( 'woocommerce_thankyou', $plugin_public, 'woozoho_queue_order', 20, 1 );
 
+		$this->loader->add_action( 'woocommerce_thankyou', $plugin_public, 'woozoho_queue_order', 20, 1 );
+		//TODO: Find a better hook for new orders created.
 
 
 		//Cron Job
 		//$this->loader->add_filter( 'cron_schedules', $plugin_public, 'zoho_connector_orders_job' );
 
+	}
+
+	private function define_cron_jobs() {
+		$cron_jobs = new Woozoho_Connector_Cronjobs( $this->core );
+
+		$orders_recurrence = WC_Admin_Settings::get_option( "wc_zoho_connector_cron_orders_recurrence" );
+		if ( $orders_recurrence != "directly" ) {
+			if ( ! $cron_jobs->isOrdersJobRunning() ) {
+				$cron_jobs->setupOrdersJob();
+			}
+
+			$this->loader->add_action( 'woozoho_orders_job', $cron_jobs, 'runOrdersJob' );
+		}
 	}
 
 	/**

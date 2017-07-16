@@ -31,17 +31,7 @@ class Woozoho_Connector_Activator {
 	 */
 	public static function activate() {
 		self::install_db();
-		self::cronjob();
 	}
-
-	private function cronjob()
-	{
-		if( !wp_next_scheduled( 'woozoho_sync_orders' ) ) {
-			wp_schedule_event( time(), 'daily', 'mycronjob' );
-
-		}
-	}
-
 
 	public function install_db()
 	{
