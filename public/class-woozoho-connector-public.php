@@ -103,36 +103,30 @@ class Woozoho_Connector_Public {
 
 	}
 
-	public function woozoho_queue_order( $order_id )
-	{
+	public function woozoho_queue_order( $order_id ) {
 
 	}
 
-	public function woozoho_sync_orders()
-	{
-		//TODO: Save all orders that have been synced.
-		//TODO: Create option field in settings for settings when to sync with Zoho.
-		//TODO: Create button for manually syncing the orders. + reset time for next sync.
+	public function woozoho_sync_orders() {
 		global $wpdb;
 
-		$today = date( 'Y-m-d' );
-		$date_from = $today;
-		$date_to = $today;
-		$post_status = implode("','", array('wc-processing', 'wc-completed') );
+		$today       = date( 'Y-m-d' );
+		$date_from   = $today;
+		$date_to     = $today;
+		$post_status = implode( "','", array( 'wc-processing', 'wc-completed' ) );
 
 		$result = $wpdb->get_results( "SELECT * FROM $wpdb->posts 
             WHERE post_type = 'shop_order'
             AND post_status IN ('{$post_status}')
             AND post_date BETWEEN '{$date_from}  00:00:00' AND '{$date_to} 23:59:59'
-        ");
+        " );
 
-		foreach ( $result as $post )
-		{
-			woozoho_push_order($post->ID);
+		foreach ( $result as $post ) {
+			woozoho_push_order( $post->ID );
 		}
 
 		echo "<pre>";
-		print_r($result);
+		print_r( $result );
 	}
 
 

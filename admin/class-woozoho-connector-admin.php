@@ -27,7 +27,7 @@ class Woozoho_Connector_Admin {
 	 *
 	 * @since    1.0.0
 	 * @access   private
-	 * @var      string    $plugin_name    The ID of this plugin.
+	 * @var      string $plugin_name The ID of this plugin.
 	 */
 	private $plugin_name;
 
@@ -36,7 +36,7 @@ class Woozoho_Connector_Admin {
 	 *
 	 * @since    1.0.0
 	 * @access   private
-	 * @var      string    $version    The current version of this plugin.
+	 * @var      string $version The current version of this plugin.
 	 */
 	private $version;
 
@@ -47,13 +47,13 @@ class Woozoho_Connector_Admin {
 	 *
 	 * @since    1.0.0
 	 *
-	 * @param      string    $plugin_name       The name of this plugin.
-	 * @param      string    $version    The version of this plugin.
+	 * @param      string $plugin_name The name of this plugin.
+	 * @param      string $version The version of this plugin.
 	 * @param      ZohoConnector $client Client for the core of Zoho Connector.
 	 */
 	public function __construct( $plugin_name, $version, $client ) {
 		$this->plugin_name = $plugin_name;
-		$this->version = $version;
+		$this->version     = $version;
 		$this->client      = $client;
 	}
 
@@ -106,17 +106,53 @@ class Woozoho_Connector_Admin {
 	//Settings page add link to settings page.
 	public function add_action_links( $links ) {
 		$settings_link = array(
-			'<a href="' . admin_url( 'admin.php?page=wc-settings&tab=zoho_connector">' . __('Settings', $this->plugin_name) . '</a>' ));
-		return array_merge(  $settings_link, $links );
+			'<a href="' . admin_url( 'admin.php?page=wc-settings&tab=zoho_connector">' . __( 'Settings', $this->plugin_name ) . '</a>' )
+		);
+
+		return array_merge( $settings_link, $links );
 	}
 
 	//WooCommerce Settings Tab Functionality
-	//TODO: Add tutorial on how to make cron work better within WordPress.
-	public function woocommerce_add_settings_tab($settings_tabs)
-	{
-		$settings_tabs['zoho_connector'] = __( 'Zoho Connector', 'woozoho-connector');
+	public function woocommerce_add_settings_tab( $settings_tabs ) {
+		$settings_tabs['zoho_connector'] = __( 'Zoho Connector', 'woozoho-connector' );
+
 		return $settings_tabs;
 	}
+
+	function woocommerce_add_bulk_actions( $bulk_actions ) {
+		$bulk_actions['send_zoho'] = __( 'Push To Zoho', 'woozoho-connector' );
+
+		return $bulk_actions;
+	}
+
+	function woocommerce_bulk_action_send_zoho( $redirect_to, $action, $post_ids ) {
+		if ( $action !== 'send_zoho' ) {
+			return $redirect_to;
+		}
+
+		foreach ( $post_ids as $post_id ) {
+			$this->client->queueOrder( $post_id, true );
+		}
+
+		$redirect_to = add_query_arg( 'bulk_send_zoho', count( $post_ids ), $redirect_to );
+
+		return $redirect_to;
+	}
+
+
+	function woocommerce_zoho_connector_admin_notices() {
+		if ( ! empty( $_REQUEST['bulk_send_zoho'] ) ) {
+			$orders_count = intval( $_REQUEST['bulk_send_zoho'] );
+
+			printf(
+				'<div id="message" class="updated fade">' .
+				_n( '%s order is queued to be send to Zoho.', '%s orders are queued to be send to Zoho.', $orders_count, 'woozoho-connector' )
+				. '</div>',
+				$orders_count
+			);
+		}
+	}
+
 
 	public static function woocommerce_settings_tab() {
 		woocommerce_admin_fields( self::get_settings() );
@@ -135,10 +171,10 @@ class Woozoho_Connector_Admin {
 	public static function get_settings() {
 		$settings = array(
 			'section_title'          => array(
-				'name'     => __( 'Zoho Connector Settings', 'woozoho-connector' ),
-				'type'     => 'title',
-				'desc'     => '',
-				'id'       => 'wc_zoho_connector_section_title'
+				'name' => __( 'Zoho Connector Settings', 'woozoho-connector' ),
+				'type' => 'title',
+				'desc' => '',
+				'id'   => 'wc_zoho_connector_section_title'
 			),
 			'token'                  => array(
 				'name' => __( 'Auth Token', 'woozoho-connector' ),
@@ -152,7 +188,7 @@ class Woozoho_Connector_Admin {
 				'desc' => __( 'Find your organisation id here.', 'woozoho-connector' ),
 				'id'   => 'wc_zoho_connector_organisation_id'
 			),
-			'notify_email' => array(
+			'notify_email'           => array(
 				'name' => __( 'Notification Email', 'woozoho-connector' ),
 				'type' => 'text',
 				'desc' => __( 'Email where notifications and logs from synchronizing are sent too.', 'woozoho-connector' ),
@@ -170,16 +206,23 @@ class Woozoho_Connector_Admin {
 				'desc' => __( 'Enable testmode?', 'woozoho-connector' ),
 				'id'   => 'wc_zoho_connector_testmode'
 			),
+			'cron_orders_enabled'    => array(
+				'name' => __( 'Enable Orders Cron', 'woozoho-connector' ),
+				'type' => 'checkbox',
+				'desc' => __( 'Automatically sync orders to zoho?', 'woozoho-connector' ),
+				'id'   => 'wc_zoho_connector_cron_orders_enabled'
+			),
 			'cron_orders_recurrence' => array(
-				'name' => __( 'Syncing Orders', 'woozoho-connector' ),
-				'type' => 'select',
+				'name'    => __( 'Syncing Orders', 'woozoho-connector' ),
+				'type'    => 'select',
 				'options' => array(
 					'directly'   => __( 'Directly', 'woozoho-connector' ),
-					'hourly' => __( 'Hourly', 'woozoho-connector' ),
+					'hourly'     => __( 'Hourly', 'woozoho-connector' ),
 					'twicedaily' => __( 'Twice Daily', 'woozoho-connector' ),
-					'daily' => __( 'Daily', 'woozoho-connector' )),
-				'desc' => __( 'How often should orders be synced?', 'woozoho-connector' ),
-				'id'   => 'wc_zoho_connector_cron_orders_recurrence'
+					'daily'      => __( 'Daily', 'woozoho-connector' )
+				),
+				'desc'    => __( 'How often should orders be synced?', 'woozoho-connector' ),
+				'id'      => 'wc_zoho_connector_cron_orders_recurrence'
 			),
 			'orders_queue_max_tries' => array(
 				'name'    => __( 'Orders Queue Max Tries', 'woozoho-connector' ),
@@ -190,9 +233,10 @@ class Woozoho_Connector_Admin {
 			),
 			'section_end'            => array(
 				'type' => 'sectionend',
-				'id' => 'wc_zoho_connector_section_end'
+				'id'   => 'wc_zoho_connector_section_end'
 			)
 		);
+
 		return apply_filters( 'wc_zoho_connector_settings', $settings );
 	}
 	//END

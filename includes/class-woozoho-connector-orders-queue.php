@@ -41,7 +41,7 @@ class Woozoho_Connector_Orders_Queue {
 	function addOrder( $order_id ) {
 		global $wpdb;
 
-		$this->writeDebug( "Orders Queue", "Inserting order '" . $order_id . "' into queue." );
+		$this->client->writeDebug( "Orders Queue", "Inserting order '" . $order_id . "' into queue." );
 
 		if ( ! $wpdb->get_var(
 			$wpdb->prepare(
@@ -112,5 +112,4 @@ class Woozoho_Connector_Orders_Queue {
 			$this->client->writeDebug( "Orders Queue", "ERROR: No orders in queue found for order id: " . $order_id . "." );
 		}
 	}
-
 }

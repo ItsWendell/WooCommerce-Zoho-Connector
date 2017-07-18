@@ -35,7 +35,7 @@ class Woozoho_Connector {
 	 *
 	 * @since    1.0.0
 	 * @access   protected
-	 * @var      Woozoho_Connector_Loader    $loader    Maintains and registers all hooks for the plugin.
+	 * @var      Woozoho_Connector_Loader $loader Maintains and registers all hooks for the plugin.
 	 */
 	protected $loader;
 
@@ -44,7 +44,7 @@ class Woozoho_Connector {
 	 *
 	 * @since    1.0.0
 	 * @access   protected
-	 * @var      string    $plugin_name    The string used to uniquely identify this plugin.
+	 * @var      string $plugin_name The string used to uniquely identify this plugin.
 	 */
 	protected $plugin_name;
 
@@ -53,7 +53,7 @@ class Woozoho_Connector {
 	 *
 	 * @since    1.0.0
 	 * @access   protected
-	 * @var      string    $version    The current version of the plugin.
+	 * @var      string $version The current version of the plugin.
 	 */
 	protected $version;
 
@@ -71,7 +71,7 @@ class Woozoho_Connector {
 	public function __construct() {
 
 		$this->plugin_name = 'woozoho-connector';
-		$this->version = '1.0.0';
+		$this->version     = '1.0.0';
 
 		$this->load_dependencies();
 		$this->set_locale();
@@ -82,8 +82,7 @@ class Woozoho_Connector {
 		$this->define_cron_jobs();
 	}
 
-	public function core()
-	{
+	public function core() {
 		return $this->core;
 	}
 
@@ -105,8 +104,7 @@ class Woozoho_Connector {
 	 * @since    1.0.0
 	 * @access   private
 	 */
-	private function load_dependencies()
-	{
+	private function load_dependencies() {
 
 		/**
 		 * The class responsible for orchestrating the actions and filters of the
@@ -183,6 +181,11 @@ class Woozoho_Connector {
 
 		$plugin_basename = plugin_basename( plugin_dir_path( __DIR__ ) . $this->plugin_name . '.php' );
 		$this->loader->add_filter( 'plugin_action_links_' . $plugin_basename, $plugin_admin, 'add_action_links' );
+
+		//WooCommerce Actions
+		$this->loader->add_filter( 'bulk_actions-edit-shop_order', $plugin_admin, 'woocommerce_add_bulk_actions' );
+		$this->loader->add_filter( 'handle_bulk_actions-edit-shop_order', $plugin_admin, 'woocommerce_bulk_action_send_zoho', 10, 3 );
+		$this->loader->add_action( 'admin_notices', $plugin_admin, 'woocommerce_zoho_connector_admin_notices' );
 	}
 
 	/**
@@ -193,7 +196,7 @@ class Woozoho_Connector {
 	 * @access   private
 	 */
 	private function define_public_hooks() {
-		$plugin_public = new Woozoho_Connector_Public( $this->get_plugin_name(), $this->get_version(), $this->core);
+		$plugin_public = new Woozoho_Connector_Public( $this->get_plugin_name(), $this->get_version(), $this->core );
 
 		//Styles & Scripts
 		$this->loader->add_action( 'wp_enqueue_scripts', $plugin_public, 'enqueue_styles' );
@@ -202,8 +205,6 @@ class Woozoho_Connector {
 		//Queue orders for synchronisation to Zoho.
 
 		$this->loader->add_action( 'woocommerce_thankyou', $plugin_public, 'woozoho_queue_order', 20, 1 );
-		//TODO: Find a better hook for new orders created.
-
 
 		//Cron Job
 		//$this->loader->add_filter( 'cron_schedules', $plugin_public, 'zoho_connector_orders_job' );
@@ -214,12 +215,17 @@ class Woozoho_Connector {
 		$cron_jobs = new Woozoho_Connector_Cronjobs( $this->core );
 
 		$orders_recurrence = WC_Admin_Settings::get_option( "wc_zoho_connector_cron_orders_recurrence" );
-		if ( $orders_recurrence != "directly" ) {
-			if ( ! $cron_jobs->isOrdersJobRunning() ) {
-				$cron_jobs->setupOrdersJob();
-			}
+		$isEnabled         = WC_Admin_Settings::get_option( "wc_zoho_connector_cron_orders_enabled" );
+		if ( $isEnabled ) {
+			if ( $orders_recurrence != "directly" ) {
+				if ( ! $cron_jobs->isOrdersJobRunning() ) {
+					$cron_jobs->setupOrdersJob();
+				}
 
-			$this->loader->add_action( 'woozoho_orders_job', $cron_jobs, 'runOrdersJob' );
+				$this->loader->add_action( 'woozoho_orders_job', $cron_jobs, 'runOrdersJob' );
+			}
+		} else if ( ! $isEnabled && $cron_jobs->isOrdersJobRunning() ) {
+			$cron_jobs->stopOrdersJob();
 		}
 	}
 

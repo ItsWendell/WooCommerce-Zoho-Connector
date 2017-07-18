@@ -67,9 +67,8 @@ require plugin_dir_path( __FILE__ ) . 'includes/class-woozoho-connector.php';
  * @since    1.0.0
  */
 function run_woozoho_connector() {
-
 	$plugin = new Woozoho_Connector();
 	$plugin->run();
-
 }
+
 run_woozoho_connector();

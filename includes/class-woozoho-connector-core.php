@@ -73,7 +73,8 @@ class ZohoConnector {
 		$mailTo = WC_Admin_Settings::get_option( "wc_zoho_connector_notify_email" );
 		if ( $mailTo ) {
 			$headers[] = 'From: WordPress Zoho Connector <wordpress@mydoo.nl>';
-			wp_mail( WC_Admin_Settings::get_option( "wc_zoho_connector_notify_email" ), "WooCommerce Zoho Connector:" . $subject, $message, $headers );
+			$headers[] = 'Content-Type: text/html; charset=UTF-8';
+			wp_mail( $mailTo, "WooCommerce Zoho Connector:" . $subject, $message, $headers );
 			$this->writeDebug( "Notification Email", "Email with subject '" . $subject . " sent to " . $mailTo );
 		}
 	}
@@ -143,12 +144,24 @@ class ZohoConnector {
 			"name"        => $zohoItem->name,
 			"description" => $zohoItem->description,
 			"quantity"    => $storeItem->get_quantity(),
-			/*"product_type" => "goods", //TODO: Fix.*/
 			"tax_id"      => $zohoItem->tax_id,
 			"unit"        => $zohoItem->unit,
 		);
 
 		return $convertedItem;
+	}
+
+	function itemToNotes( $item ) {
+		$returnString = "";
+		$returnString .= $item['name'] . " ";
+		if ( $item->get_product() && ! empty( $item->get_product()->get_sku() ) ) {
+			$returnString .= "(" . $item->get_product()->get_sku() . ") ";
+		}
+		$returnString .= "| Quantity: " . $item->get_quantity();
+		$returnString .= "| Total Price: " . $item->get_total();
+		$returnString .= "\n";
+
+		return $returnString;
 	}
 
 	function pushOrder( $order_id ) {
@@ -164,7 +177,7 @@ class ZohoConnector {
 
 			$contact = $this->getContact( $user_info->user_email );
 
-			$this->writeDebug( "Push Order", "Contact info ($user_info->user_email) \n " . serialize( $contact ) );
+			//$this->writeDebug( "Push Order", "Contact info ($user_info->user_email) \n " . serialize( $contact ) );
 
 			if ( ! $contact ) {
 				$this->writeDebug( "Push Order", "Order " . $order_id . ": Email (" . $user_info->user_email . ") doesn't exist in Zoho. Creating contact..." );
@@ -174,7 +187,6 @@ class ZohoConnector {
 					$this->ordersQueue->updateOrder( $order_id, "error", "Couldn't create contact in Zoho.", true );
 					$isQueued = true;
 					$this->sendNotificationEmail( "Can't create contact: " . $user_info->user_email, "WooCommerce Zoho Connector couldn't create the contact required for the order, updating queue." );
-
 					return false;
 				} else {
 					$this->writeDebug( "Push Order", "Order " . $order_id . ": Contact created by email (" . $user_info->user_email . ") in Zoho." );
@@ -186,59 +198,89 @@ class ZohoConnector {
 			$salesOrder = array();
 
 			//setup basic sales order details.
-			$salesOrder["salesorder_number"] = "TEST-" . $order_id;
+			if ( WC_Admin_Settings::get_option( "wc_zoho_connector_testmode" ) ) {
+				$salesOrder["salesorder_number"] = "TEST-" . $order_id;
+			}
+
 			$salesOrder["customer_id"]       = $contact->contact_id;
 			$salesOrder["customer_name"]     = $contact->company_name;
 			$salesOrder["date"]              = date( 'Y-m-d' );
-			$salesOrder["reference_number"]  = "WP-" . $order_id;
+
+			if ( is_multisite() ) {
+				$salesOrder["reference_number"] = "WP-" . $order_id . "-" . get_current_blog_id();
+			} else {
+				$salesOrder["reference_number"] = "WP-" . $order_id;
+			}
+
 			$salesOrder["line_items"]        = array();
 			$salesOrder["status"]            = "draft";
 
 			$num = 0;
 
-			$notes = "";
+			$missingProducts  = "";
+			$inactiveProducts = "";
 
 			//Loop through each item.
 			foreach ( $items as $item ) {
-				if ( ! empty( $item->get_product()->get_sku() ) ) {
-					$this->writeDebug( "Push Order", "Looking for product in zoho with SKU: " . $item->get_product()->get_sku() . "\n" );
-
-					$zohoItem = $this->getItem( $item->get_product()->get_sku() );
-
-					if ( ! $zohoItem ) {
-						$notes .= $item->get_product()->get_name() . "(" . $item->get_product()->get_sku() . " x" . $item->get_quantity() . " - Price: " . $item->get_total() . "\n";
-						$this->writeDebug( "Push Order", "Product (" . $item->get_product()->get_sku() . ") not found. Adding to notes.\n" );
+				if ( $item->get_product() ) {
+					if ( ! empty( $item->get_product()->get_sku() ) ) {
+						$this->writeDebug( "Push Order", "Looking for product in zoho with SKU: " . $item->get_product()->get_sku() . "\n" );
+						$zohoItem = $this->getItem( $item->get_product()->get_sku() );
+						if ( ! $zohoItem ) {
+							$missingProducts .= $this->itemToNotes( $item );
+							$this->writeDebug( "Push Order", "Product (" . $item->get_product()->get_sku() . ") not found. Adding to notes.\n" );
+						} else {
+							if ( $zohoItem->status == "active" ) {
+								$line_item = $this->itemConvert( $zohoItem, $item );
+								array_push( $salesOrder["line_items"], $line_item );
+								$this->writeDebug( "Push Order", "Product " . $item->get_product()->get_sku() . " successfully found.\n" );
+							} else {
+								$this->writeDebug( "Push Order", "Product " . $item->get_product()->get_sku() . " is inactive, added to notes.\n" );
+								$inactiveProducts .= $this->itemToNotes( $item );
+							}
+						}
 					} else {
-						$line_item = $this->itemConvert( $zohoItem, $item );
-						array_push( $salesOrder["line_items"], $line_item );
-						$this->writeDebug( "Push Order", "Product " . $item->get_product()->get_sku() . " successfully found.\n" . serialize( $zohoItem ) );
+						$missingProducts .= $this->itemToNotes( $item );
+						$this->writeDebug( "Push Order", "Error: SKU not found of product ID: " . $item['product_id'] . ". Product is added as a note." );
 					}
 				} else {
-					$this->sendNotificationEmail( "SKU not found", "SKU not found of product ID: " . $item->get_product()->get_id() . ". Product is added as a note." );
-					$this->writeDebug( "Push Order", "Error: SKU not found of product ID: " . $item->get_product()->get_id() . ". Product is added as a note." );
-					$notes .= $item->get_product()->get_name() . "(" . $item->get_product()->get_sku() . " x" . $item->get_quantity() . " - Price: " . $item->get_total() . "\n";
+					$missingProducts .= $this->itemToNotes( $item );
+					$this->writeDebug( "Push Order", "Error: Product (" . $item['name'] . ") not found in WooCommerce, so we can't find SKU. Product is added as a note." );
 				}
+				//TODO: Create list of missing items?
 			}
 
-			$salesOrder["notes"] = $notes;
-
-			$this->writeDebug( "Push Order", "Final result of order: \n\r" . serialize( $salesOrder ) );
-
-			if ( WC_Admin_Settings::get_option( "wc_zoho_connector_testmode" ) ) {
-				$salesOrderOutput = $this->zohoClient->createSalesOrder( $salesOrder, true );
-				$this->writeDebug( "Push Order", "Sales order data: " . serialize( $salesOrderOutput ) );
-
-				if ( ! $salesOrderOutput->salesorder ) {
-					$this->writeDebug( "Push Order", "Couldn't push $order_id to Zoho. Something went wrong with pushing the order data." );
-					$this->ordersQueue->updateOrder( $order_id, "error", "Something went wrong with pushing the order data.", true );
-
-					return false;
-				}
-
-				$this->ordersQueue->updateOrder( $order_id, "success", "Successfully pushed to Zoho.", true );
-			} else {
-				$this->writeDebug( "Push Order", "Test mode enabled, skipping actual pushing to Zoho." );
+			if ( empty( $salesOrder["line_items"] ) ) {
+				array_push( $salesOrder["line_items"], $this->getItem( "PLACEHOLDER" ) ); //TODO: Find long term solution for this.
+				$this->writeDebug( "Push Order", "Order is empty or no SKU's can't be found for Order ID: " . $order_id );
 			}
+
+			//Handle Notes
+			if ( ! empty( $missingProducts ) ) {
+				$missingProducts = "Missing products:\n" . $missingProducts;
+			}
+
+			if ( ! empty( $inactiveProducts ) ) {
+				$inactiveProducts = "Inactive products:\n" . $inactiveProducts;
+			}
+
+			$orderComment = $missingProducts . "\n" . $inactiveProducts . "\nAutomatically generated by WooCommerce Zoho Connector.";
+
+			//$salesOrder["notes"] = $notes;
+
+			$salesOrderOutput = $this->zohoClient->createSalesOrder( $salesOrder, WC_Admin_Settings::get_option( "wc_zoho_connector_testmode" ) );
+
+			//$this->writeDebug( "Push Order", "Sales order data: " . serialize( $salesOrderOutput ) );
+
+			if ( ! $salesOrderOutput->salesorder ) {
+				$this->writeDebug( "Push Order", "Couldn't push $order_id to Zoho. Something went wrong with pushing the order data." );
+				$this->ordersQueue->updateOrder( $order_id, "error", "Something went wrong with pushing the order data.", true );
+
+				return false;
+			}
+
+			$this->ordersQueue->updateOrder( $order_id, "success", "Successfully pushed to Zoho.", true );
+			$this->zohoClient->createComment( $salesOrderOutput->salesorder->salesorder_id, $orderComment );
 
 			$this->writeDebug( "Push Order", "Successfully pushed $order_id to Zoho." );
 
@@ -256,8 +298,21 @@ class ZohoConnector {
 
 	public function writeDebug( $type, $data ) {
 		if ( WC_Admin_Settings::get_option( "wc_zoho_connector_debugging" ) ) {
-			file_put_contents( '/home/mydoodev/mydoo.nl/wp-content/plugins/woozoho-connector/debug_log.txt',
-				"[WooCommerce Zoho Connector] [" . date( "Y-m-d H:i:s" ) . "] [" . $type . "] " . $data . "\n", FILE_APPEND );
+			file_put_contents( '/home/mydoodev/mydoo.nl/wp-content/plugins/woozoho-connector/debug_log',
+				"[" . date( "Y-m-d H:i:s" ) . "] [" . $type . "] " . $data . "\n", FILE_APPEND );
+		}
+	}
+
+	public function queueOrder( $post_id, $timestamp ) {
+
+		$this->ordersQueue->addOrder( $post_id );
+
+		add_action( 'woozoho_push_order_queue', 'pushOrder', 10, 1 );
+
+		if ( $timestamp ) {
+			wp_schedule_single_event( $timestamp, 'woozoho_push_order_queue', array( $post_id ) );
+		} else {
+			wp_schedule_single_event( time() + 30, 'woozoho_push_order_queue', array( $post_id ) );
 		}
 	}
 }

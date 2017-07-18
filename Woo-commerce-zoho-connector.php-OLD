@@ -17,8 +17,6 @@ include "zoho_settings.php";
 register_activation_hook( __FILE__, 'woozoho_activate' );
 register_deactivation_hook( __FILE__, 'woozoho_deactivate' );
 
-//TODO: Find a Zoho API Library for PHP, We're using composer, so that's handy.
-
 function woozoho_activate($networkwide)
 {
 	global $wpdb;
@@ -97,11 +95,6 @@ function woozoho_push_order($order_id)
 			woozoho_debug( "Sales Order Result", $salesorder );
 
 			//$client->createSalesOrder($salesorder);
-
-			//TODO: Find products in inventory by SKU (Product ID), connect to new Sales Order.
-			//TODO: Item not found? Write in notes. Make Note in Logbook?
-			//TODO: Find user in CRM by email, connect to new Sales Order.
-			//TODO: Push Order To Inventory / CRM.
 		}
 	}
 }

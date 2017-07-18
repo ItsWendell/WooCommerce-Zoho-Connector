@@ -43,5 +43,4 @@ class Woozoho_Connector_i18n {
 	}
 
 
-
 }

@@ -33,16 +33,20 @@ class Woozoho_Connector_Activator {
 		self::install_db();
 	}
 
-	public function install_db()
-	{
-		//TODO: Save and check database version for upgrades.
+	/**
+	 *
+	 */
+	public function install_db() {
 		global $wpdb;
+		$client     = new ZohoConnector();
 		$table_name = $wpdb->prefix . 'woozoho_orders_tracker';
+		$client->writeDebug( "Install DB", "Activating plugin in " . $table_name );
 
-		if($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
-			$charset_collate = $wpdb->get_charset_collate();
+		if ( $wpdb->get_var( "SHOW TABLES LIKE '$table_name'" ) != $table_name ) {
+			$client->writeDebug( "Install DB", "Table doesn't exist, creating table " . $table_name );
 
-			$sql = "CREATE TABLE ".$table_name." (
+			//TODO: Optimaize table fields like status to be more efficient.
+			$sql = "CREATE TABLE " . $table_name . " (
             'ID' bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
             'post_id' bigint(20) UNSIGNED NOT NULL,
             'status' text NOT NULL,
@@ -56,9 +60,8 @@ class Woozoho_Connector_Activator {
 
 			require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
 			dbDelta( $sql );
-		}
-		else {
-			//We already have the database there.
+		} else {
+			$client->writeDebug( "Install DB", "Table already installed. Moving on." );
 		}
 	}
 }

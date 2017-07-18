@@ -9,6 +9,3 @@
  */
 
 //Check if new orders since last sync session
-//TODO: SAVE last sync between orders
-//TODO: SAVE current state after syncing
-

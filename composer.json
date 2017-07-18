@@ -1,7 +1,12 @@
 {
   "name": "digispark/woocommerce-zoho-connector",
   "description": "WordPress WooCommerce Connector",
-  "keywords": ["wordpress", "zoho", "woocommerce", "connector"],
+  "keywords": [
+    "wordpress",
+    "zoho",
+    "woocommerce",
+    "connector"
+  ],
   "homepage": "https://digispark.nl",
   "license": "MIT",
   "authors": [
