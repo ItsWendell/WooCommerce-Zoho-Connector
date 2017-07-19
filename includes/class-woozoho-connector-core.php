@@ -137,16 +137,21 @@ class ZohoConnector {
 		}
 	}
 
-	public function itemConvert( $zohoItem, $storeItem ) {
+	public function itemConvert( $zohoItem, $storeItem, $quantity = 0 ) {
 		$convertedItem = array(
 			"item_id"     => $zohoItem->item_id,
 			"rate"        => $zohoItem->rate,
 			"name"        => $zohoItem->name,
 			"description" => $zohoItem->description,
-			"quantity"    => $storeItem->get_quantity(),
 			"tax_id"      => $zohoItem->tax_id,
 			"unit"        => $zohoItem->unit,
 		);
+
+		if ( $storeItem == false && $quantity != 0 ) {
+			$convertedItem["quantity"] = $quantity;
+		} else {
+			$convertedItem["quantity"] = $storeItem->get_quantity();
+		}
 
 		return $convertedItem;
 	}
@@ -158,7 +163,7 @@ class ZohoConnector {
 			$returnString .= "(" . $item->get_product()->get_sku() . ") ";
 		}
 		$returnString .= "| Quantity: " . $item->get_quantity();
-		$returnString .= "| Total Price: " . $item->get_total();
+		$returnString .= " | Total Price: " . $item->get_total();
 		$returnString .= "\n";
 
 		return $returnString;
@@ -190,6 +195,9 @@ class ZohoConnector {
 					return false;
 				} else {
 					$this->writeDebug( "Push Order", "Order " . $order_id . ": Contact created by email (" . $user_info->user_email . ") in Zoho." );
+					if ( WC_Admin_Settings::get_option( "wc_zoho_connector_notify_email_option" )["new_user"] ) {
+						$this->sendNotificationEmail( "A new user has been created.", "New user with email: " . $user_info->user_email . " has been created." );
+					}
 				}
 			}
 
@@ -224,34 +232,40 @@ class ZohoConnector {
 			foreach ( $items as $item ) {
 				if ( $item->get_product() ) {
 					if ( ! empty( $item->get_product()->get_sku() ) ) {
-						$this->writeDebug( "Push Order", "Looking for product in zoho with SKU: " . $item->get_product()->get_sku() . "\n" );
+						$this->writeDebug( "Push Order", "Looking for product in zoho with SKU: " . $item->get_product()->get_sku() );
 						$zohoItem = $this->getItem( $item->get_product()->get_sku() );
 						if ( ! $zohoItem ) {
 							$missingProducts .= $this->itemToNotes( $item );
-							$this->writeDebug( "Push Order", "Product (" . $item->get_product()->get_sku() . ") not found. Adding to notes.\n" );
+							$this->writeDebug( "Push Order", "Product (" . $item->get_product()->get_sku() . ") not found. Adding to notes." );
+							if ( WC_Admin_Settings::get_option( "wc_zoho_connector_notify_email_option" )["sku_zoho"] ) {
+								$this->sendNotificationEmail( "SKU '" . $item->get_product()->get_sku() . "' not found in Zoho.", "SKU '" . $item->get_product()->get_sku() . "' not found in Zoho." );
+							}
 						} else {
 							if ( $zohoItem->status == "active" ) {
 								$line_item = $this->itemConvert( $zohoItem, $item );
 								array_push( $salesOrder["line_items"], $line_item );
-								$this->writeDebug( "Push Order", "Product " . $item->get_product()->get_sku() . " successfully found.\n" );
+								$this->writeDebug( "Push Order", "Product " . $item->get_product()->get_sku() . " successfully found." );
 							} else {
-								$this->writeDebug( "Push Order", "Product " . $item->get_product()->get_sku() . " is inactive, added to notes.\n" );
+								$this->writeDebug( "Push Order", "Product " . $item->get_product()->get_sku() . " is inactive, added to notes." );
 								$inactiveProducts .= $this->itemToNotes( $item );
 							}
 						}
 					} else {
 						$missingProducts .= $this->itemToNotes( $item );
 						$this->writeDebug( "Push Order", "Error: SKU not found of product ID: " . $item['product_id'] . ". Product is added as a note." );
+						if ( WC_Admin_Settings::get_option( "wc_zoho_connector_notify_email_option" )["sku_woocommerce"] ) {
+							$this->sendNotificationEmail( "SKU of Product  '" . $item['name'] . "' not found in WooCommerce.", "SKU of Product  '" . $item['name'] . "' (" . $item['product_id'] . ") not found in WooCommerce." );
+						}
 					}
 				} else {
 					$missingProducts .= $this->itemToNotes( $item );
 					$this->writeDebug( "Push Order", "Error: Product (" . $item['name'] . ") not found in WooCommerce, so we can't find SKU. Product is added as a note." );
 				}
-				//TODO: Create list of missing items?
 			}
 
 			if ( empty( $salesOrder["line_items"] ) ) {
-				array_push( $salesOrder["line_items"], $this->getItem( "PLACEHOLDER" ) ); //TODO: Find long term solution for this.
+				$placeHolder = $this->itemConvert( $this->getItem( "PLACEHOLDER" ), false, 1 );
+				array_push( $salesOrder["line_items"], $placeHolder ); //TODO: Find long term solution for this.
 				$this->writeDebug( "Push Order", "Order is empty or no SKU's can't be found for Order ID: " . $order_id );
 			}
 
@@ -307,12 +321,10 @@ class ZohoConnector {
 
 		$this->ordersQueue->addOrder( $post_id );
 
-		add_action( 'woozoho_push_order_queue', 'pushOrder', 10, 1 );
-
 		if ( $timestamp ) {
 			wp_schedule_single_event( $timestamp, 'woozoho_push_order_queue', array( $post_id ) );
 		} else {
-			wp_schedule_single_event( time() + 30, 'woozoho_push_order_queue', array( $post_id ) );
+			wp_schedule_single_event( time() + 5, 'woozoho_push_order_queue', array( $post_id ) );
 		}
 	}
 }

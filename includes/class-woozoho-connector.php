@@ -186,6 +186,7 @@ class Woozoho_Connector {
 		$this->loader->add_filter( 'bulk_actions-edit-shop_order', $plugin_admin, 'woocommerce_add_bulk_actions' );
 		$this->loader->add_filter( 'handle_bulk_actions-edit-shop_order', $plugin_admin, 'woocommerce_bulk_action_send_zoho', 10, 3 );
 		$this->loader->add_action( 'admin_notices', $plugin_admin, 'woocommerce_zoho_connector_admin_notices' );
+		$this->loader->add_action( 'woozoho_push_order_queue', $plugin_admin, 'pushOrder', 10, 1 );
 	}
 
 	/**
@@ -205,7 +206,7 @@ class Woozoho_Connector {
 		//Queue orders for synchronisation to Zoho.
 
 		$this->loader->add_action( 'woocommerce_thankyou', $plugin_public, 'woozoho_queue_order', 20, 1 );
-
+		//TODO: Find better hook for woocommerce new order.
 		//Cron Job
 		//$this->loader->add_filter( 'cron_schedules', $plugin_public, 'zoho_connector_orders_job' );
 

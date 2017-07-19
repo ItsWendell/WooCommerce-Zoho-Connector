@@ -131,7 +131,7 @@ class Woozoho_Connector_Admin {
 		}
 
 		foreach ( $post_ids as $post_id ) {
-			$this->client->queueOrder( $post_id, true );
+			$this->client->queueOrder( $post_id, false );
 		}
 
 		$redirect_to = add_query_arg( 'bulk_send_zoho', count( $post_ids ), $redirect_to );
@@ -151,6 +151,10 @@ class Woozoho_Connector_Admin {
 				$orders_count
 			);
 		}
+	}
+
+	function pushOrder( $order_id ) {
+		$this->client->pushOrder( $order_id );
 	}
 
 
@@ -182,31 +186,43 @@ class Woozoho_Connector_Admin {
 				'desc' => __( 'Generate a auth code here.', 'woozoho-connector' ),
 				'id'   => 'wc_zoho_connector_token'
 			),
-			'organisation_id'        => array(
+			'organisation_id'     => array(
 				'name' => __( 'Organisation Id', 'woozoho-connector' ),
 				'type' => 'text',
 				'desc' => __( 'Find your organisation id here.', 'woozoho-connector' ),
 				'id'   => 'wc_zoho_connector_organisation_id'
 			),
-			'notify_email'           => array(
+			'notify_email'        => array(
 				'name' => __( 'Notification Email', 'woozoho-connector' ),
 				'type' => 'text',
 				'desc' => __( 'Email where notifications and logs from synchronizing are sent too.', 'woozoho-connector' ),
 				'id'   => 'wc_zoho_connector_notify_email'
 			),
-			'debugging'              => array(
+			'notify_email_option' => array(
+				'name'    => __( 'Notification Email Options', 'woozoho-connector' ),
+				'type'    => 'multiselect',
+				'desc'    => __( 'Where should emails be enabled?', 'woozoho-connector' ),
+				'options' => array(
+					'sku_woocommerce' => 'WooCommerce SKU not found.',
+					'sku_zoho'        => 'Zoho SKU not found.',
+					'new_user'        => 'New user has been created.',
+					'zoho_error_user' => 'Cant create zoho user.',
+				),
+				'id'      => 'wc_zoho_connector_notify_email_option'
+			),
+			'debugging'           => array(
 				'name' => __( 'Debugging', 'woozoho-connector' ),
 				'type' => 'checkbox',
 				'desc' => __( 'Enable debugging in logfile?', 'woozoho-connector' ),
 				'id'   => 'wc_zoho_connector_debugging'
 			),
-			'testmode'               => array(
+			'testmode'            => array(
 				'name' => __( 'Test mode', 'woozoho-connector' ),
 				'type' => 'checkbox',
 				'desc' => __( 'Enable testmode?', 'woozoho-connector' ),
 				'id'   => 'wc_zoho_connector_testmode'
 			),
-			'cron_orders_enabled'    => array(
+			'cron_orders_enabled' => array(
 				'name' => __( 'Enable Orders Cron', 'woozoho-connector' ),
 				'type' => 'checkbox',
 				'desc' => __( 'Automatically sync orders to zoho?', 'woozoho-connector' ),

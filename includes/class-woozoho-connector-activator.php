@@ -30,13 +30,6 @@ class Woozoho_Connector_Activator {
 	 * @since    1.0.0
 	 */
 	public static function activate() {
-		self::install_db();
-	}
-
-	/**
-	 *
-	 */
-	public function install_db() {
 		global $wpdb;
 		$client     = new ZohoConnector();
 		$table_name = $wpdb->prefix . 'woozoho_orders_tracker';
@@ -44,22 +37,25 @@ class Woozoho_Connector_Activator {
 
 		if ( $wpdb->get_var( "SHOW TABLES LIKE '$table_name'" ) != $table_name ) {
 			$client->writeDebug( "Install DB", "Table doesn't exist, creating table " . $table_name );
+			global $wpdb;
+			$charset_collate = $wpdb->get_charset_collate();
 
-			//TODO: Optimaize table fields like status to be more efficient.
-			$sql = "CREATE TABLE " . $table_name . " (
-            'ID' bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
-            'post_id' bigint(20) UNSIGNED NOT NULL,
-            'status' text NOT NULL,
-            'date_created' datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            'date_updated' datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            'tries' int(11) NOT NULL,
-            'message' text NOT NULL,
-            PRIMARY KEY ('ID'),
-            KEY 'post_id' ('post_id')
-			) ENGINE=MyISAM DEFAULT CHARSET=latin1;";
+			$sql = "CREATE TABLE $table_name (
+  			ID bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            post_id bigint(20) UNSIGNED NOT NULL,
+            status text NOT NULL,
+            date_created datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            date_updated datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            tries int(11) NOT NULL,
+            message text NOT NULL,
+  			PRIMARY KEY  (ID),
+  			KEY post_id (post_id)
+				)";
 
 			require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
-			dbDelta( $sql );
+			$resultData = dbDelta( $sql );
+			$client->writeDebug( "Install DB", $resultData );
+
 		} else {
 			$client->writeDebug( "Install DB", "Table already installed. Moving on." );
 		}
