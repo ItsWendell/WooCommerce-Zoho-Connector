@@ -164,7 +164,7 @@ class Woozoho_Connector_Admin {
 
 	public static function woocommerce_update_settings() {
 		$oldOrderRecurrence = WC_Admin_Settings::get_option( "wc_zoho_connector_cron_orders_recurrence" );
-		//ZohoConnector::writeDebug("Settings", "Settings updated!");
+		ZohoConnector::writeDebug( "Settings", "Settings updated!" );
 		woocommerce_update_options( self::get_settings() );
 		if ( $oldOrderRecurrence != WC_Admin_Settings::get_option( "wc_zoho_connector_cron_orders_recurrence" ) ) {
 			$cronJobs = new Woozoho_Connector_Cronjobs( new ZohoConnector() );

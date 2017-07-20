@@ -70,6 +70,7 @@ class ZohoConnector {
 	}
 
 	public function sendNotificationEmail( $subject, $message ) {
+		//TODO: Add multisite support
 		$mailTo = WC_Admin_Settings::get_option( "wc_zoho_connector_notify_email" );
 		if ( $mailTo ) {
 			$headers[] = 'From: WordPress Zoho Connector <wordpress@mydoo.nl>';
@@ -206,8 +207,11 @@ class ZohoConnector {
 			$salesOrder = array();
 
 			//setup basic sales order details.
-			if ( WC_Admin_Settings::get_option( "wc_zoho_connector_testmode" ) ) {
+			if ( WC_Admin_Settings::get_option( "wc_zoho_connector_testmode" ) == "yes" ) {
+				$this->writeDebug( "Push Order", "TEST MODE IS ENABLED, USING TEST ID's." );
 				$salesOrder["salesorder_number"] = "TEST-" . $order_id;
+			} else {
+				$this->writeDebug( "Push Order", "LIVE MODE ENABLED." );
 			}
 
 			$salesOrder["customer_id"]       = $contact->contact_id;
@@ -282,7 +286,7 @@ class ZohoConnector {
 
 			//$salesOrder["notes"] = $notes;
 
-			$salesOrderOutput = $this->zohoClient->createSalesOrder( $salesOrder, WC_Admin_Settings::get_option( "wc_zoho_connector_testmode" ) );
+			$salesOrderOutput = $this->zohoClient->createSalesOrder( $salesOrder, ( WC_Admin_Settings::get_option( "wc_zoho_connector_testmode" ) == yes ) );
 
 			//$this->writeDebug( "Push Order", "Sales order data: " . serialize( $salesOrderOutput ) );
 
@@ -315,6 +319,7 @@ class ZohoConnector {
 			file_put_contents( '/home/mydoodev/mydoo.nl/wp-content/plugins/woozoho-connector/debug_log',
 				"[" . date( "Y-m-d H:i:s" ) . "] [" . $type . "] " . $data . "\n", FILE_APPEND );
 		}
+		//TODO: Add multi-site support.
 	}
 
 	public function queueOrder( $post_id, $timestamp ) {
