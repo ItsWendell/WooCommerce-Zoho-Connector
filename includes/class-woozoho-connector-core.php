@@ -34,10 +34,32 @@ class ZohoConnector {
 		return $this->ordersQueue;
 	}
 
-	public function getContact( $email ) {
-		$args          = array();
-		$args["email"] = $email;
-		$data          = $this->zohoClient->listContacts( $args );
+	public function getContact( $company, $email ) {
+		$args                 = array();
+		$args["contact_name"] = $company;
+		$data                 = $this->zohoClient->listContacts( $args ); //Find contact by company name.
+		if ( $data->contacts ) {
+			$contact_id = $data->contacts[0]->contact_id;
+
+			return $this->zohoClient->retrieveContact( $contact_id )->contact;
+		} else {
+			$args          = array();
+			$args["email"] = $email;
+			$data          = $this->zohoClient->listContacts( $args ); //Find contact by email
+			if ( $data->contacts ) {
+				$contact_id = $data->contacts[0]->contact_id;
+
+				return $this->zohoClient->retrieveContact( $contact_id )->contact;
+			} else {
+				return null;
+			}
+		}
+	}
+
+	public function getContactByCompany( $company ) {
+		$args                 = array();
+		$args["contact_name"] = $company;
+		$data                 = $this->zohoClient->listContacts( $args );
 		if ( $data->contacts ) {
 			$contact_id = $data->contacts[0]->contact_id;
 
@@ -80,37 +102,43 @@ class ZohoConnector {
 		}
 	}
 
+	/**
+	 * @param $user_info
+	 * @param WC_Order $order
+	 *
+	 * @return null
+	 */
 	public function createContact( $user_info, $order ) {
 		$contactData = array(
 			array(
-				"contact_name"    => $order->get_billing_company(),
-				"company_name"    => $order->get_billing_company(),
-				"website"         => $user_info->user_url,
-				"email"           => $user_info->user_email,
-				"notes"           => "Created by WooCommerce Zoho Connector.",
-				"billing_address",
-				array(
-					"attention" => $order->get_billing_company(),
-					"address"   => $order->get_billing_address_1(),
-					"street2"   => $order->get_billing_address_2(),
-					"city"      => $order->get_billing_city(),
-					"state"     => $order->get_billing_state(),
-					"zip"       => $order->get_billing_postcode(),
-					"country"   => $order->get_billing_country(),
-					"phone"     => $order->get_billing_phone()
-				),
-				"shipping_address",
-				array(
-					"attention" => $order->get_shipping_company(),
-					"address"   => $order->get_shipping_address_1(),
-					"street2"   => $order->get_shipping_address_2(),
-					"city"      => $order->get_shipping_city(),
-					"state"     => $order->get_shipping_state(),
-					"zip"       => $order->get_shipping_postcode(),
-					"country"   => $order->get_shipping_country(),
-					"phone"     => $order->get_shipping_phone()
-				),
-				"contact_persons" => array(
+				"contact_name"     => $order->get_billing_company(),
+				"company_name"     => $order->get_billing_company(),
+				"website"          => $user_info->user_url,
+				"email"            => $user_info->user_email,
+				"notes"            => "Created by WooCommerce Zoho Connector.",
+				"billing_address"  =>
+					array(
+						"attention" => $order->get_billing_company(),
+						"address"   => $order->get_billing_address_1(),
+						"street2"   => $order->get_billing_address_2(),
+						"city"      => $order->get_billing_city(),
+						"state"     => $order->get_billing_state(),
+						"zip"       => $order->get_billing_postcode(),
+						"country"   => $order->get_billing_country(),
+						"phone"     => $order->get_billing_phone()
+					),
+				"shipping_address" =>
+					array(
+						"attention" => $order->get_shipping_company(),
+						"address"   => $order->get_shipping_address_1(),
+						"street2"   => $order->get_shipping_address_2(),
+						"city"      => $order->get_shipping_city(),
+						"state"     => $order->get_shipping_state(),
+						"zip"       => $order->get_shipping_postcode(),
+						"country"   => $order->get_shipping_country(),
+						"phone"     => $order->get_billing_phone()
+					),
+				"contact_persons"  => array(
 					array(
 						"first_name" => $order->get_billing_first_name(),
 						"last_name"  => $order->get_billing_last_name(),
@@ -123,8 +151,8 @@ class ZohoConnector {
 
 		$resultData = $this->zohoClient->createContact( $contactData );
 
-		if ( $resultData->contact->contact ) {
-			return $resultData->contact->contact;
+		if ( $resultData->contacts[0] ) {
+			return $resultData->contacts[0];
 		} else {
 			return null;
 		}
@@ -160,7 +188,7 @@ class ZohoConnector {
 	function itemToNotes( $item ) {
 		$returnString = "";
 		$returnString .= $item['name'] . " ";
-		if ( $item->get_product() && ! empty( $item->get_product()->get_sku() ) ) {
+		if ( $item->get_product() && $item->get_product()->get_sku() ) {
 			$returnString .= "(" . $item->get_product()->get_sku() . ") ";
 		}
 		$returnString .= "| Quantity: " . $item->get_quantity();
@@ -170,53 +198,59 @@ class ZohoConnector {
 		return $returnString;
 	}
 
+	/**
+	 * @param $order_id
+	 *
+	 * @return bool
+	 */
 	function pushOrder( $order_id ) {
-		$this->writeDebug( "Push Order", "Pushing order ID; " . $order_id );
 		$isQueued = false;
 		try {
 			$order         = new WC_Order( $order_id );
-			$order_user_id = (int) $order->user_id;
+			$order_user_id = $order->user_id;
 			$user_info     = get_userdata( $order_user_id );
 			$items         = $order->get_items();
+			$salesOrder    = array();
 
 			$this->writeDebug( "Push Order", "Syncing Zoho Order ID " . $order_id . " from (" . $user_info->user_email . "): " );
 
-			$contact = $this->getContact( $user_info->user_email );
+			$contact = $this->getContact( $order->get_billing_company(), $user_info->user_email );
 
 			//$this->writeDebug( "Push Order", "Contact info ($user_info->user_email) \n " . serialize( $contact ) );
 
 			if ( ! $contact ) {
-				$this->writeDebug( "Push Order", "Order " . $order_id . ": Email (" . $user_info->user_email . ") doesn't exist in Zoho. Creating contact..." );
-				$contact = $this->createContact( $user_info, $order->get_billing_address(), $order->get_shipping_address() );
+				$this->writeDebug( "Push Order", "Contact " . $order->get_billing_company() . " (" . $user_info->user_email . ") for Order " . $order_id . " doesn't exist in Zoho. Creating contact..." );
+				$contact = $this->createContact( $user_info, $order );
 				if ( ! $contact ) {
 					$this->writeDebug( "Push Order", "Order " . $order_id . ": Can't create contact (" . $user_info->user_email . ") in Zoho. Updating order and continue." );
 					$this->ordersQueue->updateOrder( $order_id, "error", "Couldn't create contact in Zoho.", true );
 					$isQueued = true;
-					$this->sendNotificationEmail( "Can't create contact: " . $user_info->user_email, "WooCommerce Zoho Connector couldn't create the contact required for the order, updating queue." );
+
 					return false;
 				} else {
-					$this->writeDebug( "Push Order", "Order " . $order_id . ": Contact created by email (" . $user_info->user_email . ") in Zoho." );
-					if ( WC_Admin_Settings::get_option( "wc_zoho_connector_notify_email_option" )["new_user"] ) {
-						$this->sendNotificationEmail( "A new user has been created.", "New user with email: " . $user_info->user_email . " has been created." );
-					}
+					$this->writeDebug( "Push Order", "Order " . $order_id . ": Contact created for " . $order->get_billing_company() . " (" . $user_info->user_email . ") in Zoho." );
 				}
+			} else {
+				$this->writeDebug( "Push Order", "Successfully found contact for " . $order->get_billing_company() . " (" . $user_info->user_email . ")." );
 			}
 
+			$this->writeDebug( "Push Order", "Generating output to Zoho..." );
 
-			$this->writeDebug( "Push Order", "Order " . $order_id . ": Populating Order data for Zoho..." );
-			$salesOrder = array();
+
+			$salesOrder["customer_id"]   = $contact->contact_id;
+			$salesOrder["customer_name"] = $contact->company_name;
+
 
 			//setup basic sales order details.
 			if ( WC_Admin_Settings::get_option( "wc_zoho_connector_testmode" ) == "yes" ) {
-				$this->writeDebug( "Push Order", "TEST MODE IS ENABLED, USING TEST ID's." );
+				$this->writeDebug( "Push Order", "TEST MODE IS ENABLED, USING TEST ORDER ID's." );
 				$salesOrder["salesorder_number"] = "TEST-" . $order_id;
 			} else {
 				$this->writeDebug( "Push Order", "LIVE MODE ENABLED." );
 			}
 
-			$salesOrder["customer_id"]       = $contact->contact_id;
-			$salesOrder["customer_name"]     = $contact->company_name;
-			$salesOrder["date"]              = date( 'Y-m-d' );
+
+			$salesOrder["date"] = date( 'Y-m-d' );
 
 			if ( is_multisite() ) {
 				$salesOrder["reference_number"] = "WP-" . $order_id . "-" . get_current_blog_id();
@@ -224,8 +258,8 @@ class ZohoConnector {
 				$salesOrder["reference_number"] = "WP-" . $order_id;
 			}
 
-			$salesOrder["line_items"]        = array();
-			$salesOrder["status"]            = "draft";
+			$salesOrder["line_items"] = array();
+			$salesOrder["status"]     = "draft";
 
 			$num = 0;
 
@@ -235,7 +269,7 @@ class ZohoConnector {
 			//Loop through each item.
 			foreach ( $items as $item ) {
 				if ( $item->get_product() ) {
-					if ( ! empty( $item->get_product()->get_sku() ) ) {
+					if ( $item->get_product()->get_sku() ) {
 						$this->writeDebug( "Push Order", "Looking for product in zoho with SKU: " . $item->get_product()->get_sku() );
 						$zohoItem = $this->getItem( $item->get_product()->get_sku() );
 						if ( ! $zohoItem ) {
@@ -316,8 +350,9 @@ class ZohoConnector {
 
 	public function writeDebug( $type, $data ) {
 		if ( WC_Admin_Settings::get_option( "wc_zoho_connector_debugging" ) ) {
+			$multisiteString = is_multisite() ? "[" . get_bloginfo( 'name' ) . "]" : ( "" );
 			file_put_contents( '/home/mydoodev/mydoo.nl/wp-content/plugins/woozoho-connector/debug_log',
-				"[" . date( "Y-m-d H:i:s" ) . "] [" . $type . "] " . $data . "\n", FILE_APPEND );
+				$multisiteString . "[" . date( "Y-m-d H:i:s" ) . "] [" . $type . "] " . $data . "\n", FILE_APPEND );
 		}
 		//TODO: Add multi-site support.
 	}

@@ -16,7 +16,7 @@
  * Plugin Name:       WooCommerce Zoho Connector
  * Plugin URI:        https://digispark.nl/woozoho/
  * Description:       Beta version of a connector to Zoho for WooCommerce Sales Orders.
- * Version:           0.1
+ * Version:           0.1.1
  * Author:            DigiSpark
  * Author URI:        https://digispark.nl/
  * License:           GPL-2.0+

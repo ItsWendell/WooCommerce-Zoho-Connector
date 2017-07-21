@@ -51,6 +51,9 @@ class Woozoho_Connector_Cronjobs {
 
 	public function setupOrdersJob() {
 		$recurrence = WC_Admin_Settings::get_option( "wc_zoho_connector_cron_orders_recurrence" );
+		if ( $recurrence == "directly" ) {
+			$recurrence = "hourly";
+		}
 		$this->client->writeDebug( "Cron Jobs", "Setting up cron job for Orders on a " . $recurrence . " basis..." );
 		wp_schedule_event( time(), $recurrence, 'woozoho_orders_job' );
 		$this->client->writeDebug( "Cron Jobs", "Cron job is successfully setup." );

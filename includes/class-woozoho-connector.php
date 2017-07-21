@@ -205,7 +205,7 @@ class Woozoho_Connector {
 
 		//Queue orders for synchronisation to Zoho.
 
-		$this->loader->add_action( 'woocommerce_thankyou', $plugin_public, 'woozoho_queue_order', 20, 1 );
+		$this->loader->add_action( 'woocommerce_new_order', $plugin_public, 'woozoho_queue_order', 20, 1 );
 		//TODO: Find better hook for woocommerce new order.
 		//Cron Job
 		//$this->loader->add_filter( 'cron_schedules', $plugin_public, 'zoho_connector_orders_job' );

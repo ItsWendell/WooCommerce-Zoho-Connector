@@ -40,7 +40,7 @@ class Woozoho_Connector_Public {
 	 */
 	private $version;
 
-	private $zohoconnector;
+	private $core;
 
 	/**
 	 * Initialize the class and set its properties.
@@ -49,6 +49,7 @@ class Woozoho_Connector_Public {
 	 *
 	 * @param      string $plugin_name The name of the plugin.
 	 * @param      string $version The version of this plugin.
+	 * @param      ZohoConnector $core ZohoConnector
 	 */
 	public function __construct( $plugin_name, $version, $core ) {
 
@@ -104,7 +105,10 @@ class Woozoho_Connector_Public {
 	}
 
 	public function woozoho_queue_order( $order_id ) {
-
+		$this->core->getOrdersQueue()->addOrder( $order_id );
+		if ( WC_Admin_Settings::get_option( "wc_zoho_connector_cron_orders_recurrence" ) == "directly" ) {
+			$this->core->queueOrder( $order_id, false );
+		}
 	}
 
 	public function woozoho_sync_orders() {
