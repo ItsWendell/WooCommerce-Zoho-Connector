@@ -71,7 +71,7 @@ class Woozoho_Connector {
 	public function __construct() {
 
 		$this->plugin_name = 'woozoho-connector';
-		$this->version     = '1.0.0';
+		$this->version     = '0.1.1';
 
 		$this->load_dependencies();
 		$this->set_locale();
@@ -204,12 +204,7 @@ class Woozoho_Connector {
 		$this->loader->add_action( 'wp_enqueue_scripts', $plugin_public, 'enqueue_scripts' );
 
 		//Queue orders for synchronisation to Zoho.
-
 		$this->loader->add_action( 'woocommerce_new_order', $plugin_public, 'woozoho_queue_order', 20, 1 );
-		//TODO: Find better hook for woocommerce new order.
-		//Cron Job
-		//$this->loader->add_filter( 'cron_schedules', $plugin_public, 'zoho_connector_orders_job' );
-
 	}
 
 	private function define_cron_jobs() {
@@ -218,13 +213,15 @@ class Woozoho_Connector {
 		$orders_recurrence = WC_Admin_Settings::get_option( "wc_zoho_connector_cron_orders_recurrence" );
 		$isEnabled         = WC_Admin_Settings::get_option( "wc_zoho_connector_cron_orders_enabled" );
 		if ( $isEnabled ) {
-			if ( $orders_recurrence != "directly" ) {
+			if ( $orders_recurrence == "directly" ) {
+				$orders_recurrence = "hourly";
+			}
 				if ( ! $cron_jobs->isOrdersJobRunning() ) {
 					$cron_jobs->setupOrdersJob();
 				}
 
 				$this->loader->add_action( 'woozoho_orders_job', $cron_jobs, 'runOrdersJob' );
-			}
+
 		} else if ( ! $isEnabled && $cron_jobs->isOrdersJobRunning() ) {
 			$cron_jobs->stopOrdersJob();
 		}

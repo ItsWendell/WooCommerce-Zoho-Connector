@@ -105,33 +105,10 @@ class Woozoho_Connector_Public {
 	}
 
 	public function woozoho_queue_order( $order_id ) {
-		$this->core->getOrdersQueue()->addOrder( $order_id );
 		if ( WC_Admin_Settings::get_option( "wc_zoho_connector_cron_orders_recurrence" ) == "directly" ) {
 			$this->core->queueOrder( $order_id, false );
+		} else {
+			$this->core->getOrdersQueue()->addOrder( $order_id );
 		}
 	}
-
-	public function woozoho_sync_orders() {
-		global $wpdb;
-
-		$today       = date( 'Y-m-d' );
-		$date_from   = $today;
-		$date_to     = $today;
-		$post_status = implode( "','", array( 'wc-processing', 'wc-completed' ) );
-
-		$result = $wpdb->get_results( "SELECT * FROM $wpdb->posts 
-            WHERE post_type = 'shop_order'
-            AND post_status IN ('{$post_status}')
-            AND post_date BETWEEN '{$date_from}  00:00:00' AND '{$date_to} 23:59:59'
-        " );
-
-		foreach ( $result as $post ) {
-			woozoho_push_order( $post->ID );
-		}
-
-		echo "<pre>";
-		print_r( $result );
-	}
-
-
 }
