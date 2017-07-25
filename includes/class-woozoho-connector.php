@@ -76,7 +76,7 @@ class Woozoho_Connector {
 		$this->load_dependencies();
 		$this->set_locale();
 
-		$this->core = new ZohoConnector();
+		$this->core = new Woozoho_Connector_Zoho_Client();
 		$this->define_admin_hooks();
 		$this->define_public_hooks();
 		$this->define_cron_jobs();

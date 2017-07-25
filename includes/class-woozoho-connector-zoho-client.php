@@ -14,20 +14,25 @@
  * @subpackage Woozoho_Connector/includes
  * @author     Wendell Misiedjan <me@digispark.nl>
  */
-class ZohoConnector {
+class Woozoho_Connector_Zoho_Client {
 
 	protected $organizationId;
 	protected $accessToken;
 	protected $ordersQueue;
-	public $zohoClient;
+	public $zohoAPI;
 	protected $logLocation = "./";
+	protected $apiItemsCachingLocation = "./cache/items.json";
+	protected $apiCachingTimeout;
 
 	public function __construct() {
-		$args                   = array();
-		$args["accessToken"]    = WC_Admin_Settings::get_option( "wc_zoho_connector_token" );
-		$args["organizationId"] = WC_Admin_Settings::get_option( "wc_zoho_connector_organisation_id" );
-		$this->zohoClient       = new ZohoClient( $args );
-		$this->ordersQueue      = new Woozoho_Connector_Orders_Queue( $this );
+		$args                    = array();
+		$args["accessToken"]     = WC_Admin_Settings::get_option( "wc_zoho_connector_token" );
+		$args["organizationId"]  = WC_Admin_Settings::get_option( "wc_zoho_connector_organisation_id" );
+		$this->apiCachingTimeout = strtotime( "+2 days" ); //Chaching beta.
+		//TODO: Implement caching options.
+
+		$this->zohoAPI     = new Woozoho_Connector_Zoho_API( $args );
+		$this->ordersQueue = new Woozoho_Connector_Orders_Queue( $this );
 	}
 
 	public function getOrdersQueue() {
@@ -35,21 +40,22 @@ class ZohoConnector {
 	}
 
 	public function getContact( $company, $email ) {
+		//TODO: Implement caching...
 		$args                 = array();
 		$args["contact_name"] = $company;
-		$data                 = $this->zohoClient->listContacts( $args ); //Find contact by company name.
+		$data                 = $this->zohoAPI->listContacts( $args ); //Find contact by company name.
 		if ( $data->contacts ) {
 			$contact_id = $data->contacts[0]->contact_id;
 
-			return $this->zohoClient->retrieveContact( $contact_id )->contact;
+			return $this->zohoAPI->retrieveContact( $contact_id )->contact;
 		} else {
 			$args          = array();
 			$args["email"] = $email;
-			$data          = $this->zohoClient->listContacts( $args ); //Find contact by email
+			$data          = $this->zohoAPI->listContacts( $args ); //Find contact by email
 			if ( $data->contacts ) {
 				$contact_id = $data->contacts[0]->contact_id;
 
-				return $this->zohoClient->retrieveContact( $contact_id )->contact;
+				return $this->zohoAPI->retrieveContact( $contact_id )->contact;
 			} else {
 				return null;
 			}
@@ -59,7 +65,7 @@ class ZohoConnector {
 	public function getSalesOrders( $user_id ) {
 		$args                = array();
 		$args["customer_id"] = $user_id;
-		$data                = $this->zohoClient->listSalesOrders( $args );
+		$data                = $this->zohoAPI->listSalesOrders( $args );
 		if ( $data->salesorders ) {
 			return $data->salesorders;
 		} else {
@@ -67,15 +73,104 @@ class ZohoConnector {
 		}
 	}
 
-	public function getItem( $sku ) {
-		$args        = array();
-		$args["sku"] = $sku;
-		$data        = $this->zohoClient->listItems( $args );
-		if ( $data->items ) {
-			return $data->items[0];
+
+	/** Get Item By SKU live from API or using the build-in caching.
+	 *
+	 * @param string $sku SKU code from product.
+	 * @param bool $useCaching Use build-in caching system.
+	 *
+	 * @return object|null
+	 */
+	public function getItem( $sku, $useCaching = false ) {
+		if ( $useCaching && $this->isItemsCached() ) {
+			//TODO: Search within cache.
 		} else {
-			return null;
+			//TODO: Schedule event for caching, until that is done, get live results.
+
+			$args        = array();
+			$args["sku"] = $sku;
+			$data        = $this->zohoAPI->listItems( $args );
+			if ( $data->items ) {
+				return $data->items[0];
+			} else {
+				return null;
+			}
 		}
+
+		$this->zohoAPI->listItems();
+	}
+
+	public function isItemsCached() {
+		if ( file_exists( $this->apiItemsCachingLocation ) ) {
+			if ( filectime( $this->apiItemsCachingLocation ) < $this->apiCachingTimeout ) {
+				return true;
+			} else {
+				return false;
+			}
+		} else {
+			return false;
+		}
+	}
+
+	function getAllItems() {
+		$returnData = array();
+		$nextPage   = 1;
+
+		while ( $nextPage ) {
+			$args = array();
+			if ( $nextPage > 1 ) {
+				$args["page"] = $nextPage;
+			}
+			$resultData  = $this->zohoAPI->listItems( $args );
+			$hasNextPage = $resultData->items->page_context->has_more_page;
+
+			if ( count( $resultData->items->items ) >= 1 ) {
+				foreach ( $resultData->items->items as $item ) {
+					$returnData[] = $item;
+				}
+			}
+
+			if ( $hasNextPage ) {
+				$nextPage = $resultData->items->page_context->page;
+			} else {
+				$nextPage = false;
+			}
+		}
+
+		return $returnData;
+	}
+
+	function getChachedItems() {
+		$this->writeDebug( "API Caching - Items", "Listing all cached items..." );
+		$cache_file = $this->apiItemsCachingLocation;
+		$expires    = $this->apiCachingTimeout;
+		global $request_type, $purge_cache, $limit_reached, $request_limit;
+
+		if ( ! file_exists( $cache_file ) ) {
+
+		}
+
+		// Check that the file is older than the expire time and that it's not empty
+		if ( filectime( $cache_file ) < $expires || file_get_contents( $cache_file ) == '' || $purge_cache && intval( $_SESSION['views'] ) <= $request_limit ) {
+
+			// File is too old, refresh cache
+
+			//Get all items
+			$itemsCache = $this->getAllItems();
+
+			// Remove cache file on error to avoid writing wrong xml
+			if ( $itemsCache ) {
+				file_put_contents( $cache_file, $itemsCache );
+			} else {
+				unlink( $cache_file );
+			}
+		} else {
+			// Fetch cache
+			$json_results = file_get_contents( $cache_file );
+			$request_type = 'JSON';
+		}
+
+		return json_decode( $json_results );
 	}
 
 	public function sendNotificationEmail( $subject, $message ) {
@@ -136,7 +231,7 @@ class ZohoConnector {
 			)
 		);
 
-		$resultData = $this->zohoClient->createContact( $contactData );
+		$resultData = $this->zohoAPI->createContact( $contactData );
 
 		if ( $resultData->contacts[0] ) {
 			return $resultData->contacts[0];
@@ -298,7 +393,7 @@ class ZohoConnector {
 
 			$orderComment = $missingProducts . "\n" . $inactiveProducts . "\nAutomatically generated by WooCommerce Zoho Connector.";
 
-			$salesOrderOutput = $this->zohoClient->createSalesOrder( $salesOrder, ( WC_Admin_Settings::get_option( "wc_zoho_connector_testmode" ) == yes ) );
+			$salesOrderOutput = $this->zohoAPI->createSalesOrder( $salesOrder, ( WC_Admin_Settings::get_option( "wc_zoho_connector_testmode" ) == yes ) );
 
 			if ( ! $salesOrderOutput->salesorder ) {
 				$this->writeDebug( "Push Order", "Couldn't push $order_id to Zoho. Something went wrong with pushing the order data." );
@@ -309,7 +404,7 @@ class ZohoConnector {
 
 			$this->ordersQueue->updateOrder( $order_id, "success", "Successfully pushed to Zoho.", true );
 
-			$this->zohoClient->createComment( $salesOrderOutput->salesorder->salesorder_id, $orderComment ); //Adding missing / inactive products.
+			$this->zohoAPI->createComment( $salesOrderOutput->salesorder->salesorder_id, $orderComment ); //Adding missing / inactive products.
 
 			$this->writeDebug( "Push Order", "Successfully pushed $order_id to Zoho." );
 

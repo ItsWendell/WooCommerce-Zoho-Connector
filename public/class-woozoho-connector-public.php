@@ -49,7 +49,7 @@ class Woozoho_Connector_Public {
 	 *
 	 * @param      string $plugin_name The name of the plugin.
 	 * @param      string $version The version of this plugin.
-	 * @param      ZohoConnector $core ZohoConnector
+	 * @param      Woozoho_Connector_Zoho_Client $core ZohoConnector
 	 */
 	public function __construct( $plugin_name, $version, $core ) {
 

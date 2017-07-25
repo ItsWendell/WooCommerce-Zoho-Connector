@@ -71,13 +71,13 @@ class Woozoho_Connector_Orders_Queue {
 				)
 			)
 			) {
-				ZohoConnector::writeDebug( "Orders Queue", "Sucessfully inserted '" . $order_id . "' into queue." );
+				Woozoho_Connector_Zoho_Client::writeDebug( "Orders Queue", "Sucessfully inserted '" . $order_id . "' into queue." );
 			} else {
-				ZohoConnector::writeDebug( "Orders Queue", "ERROR: Something went wrong with queuing '" . $order_id . "' into queue." );
+				Woozoho_Connector_Zoho_Client::writeDebug( "Orders Queue", "ERROR: Something went wrong with queuing '" . $order_id . "' into queue." );
 			}
 		}
 		{
-			ZohoConnector::writeDebug( "Orders Queue", "Order '" . $order_id . "' already exists in queue, skipping..." );
+			Woozoho_Connector_Zoho_Client::writeDebug( "Orders Queue", "Order '" . $order_id . "' already exists in queue, skipping..." );
 		}
 	}
 

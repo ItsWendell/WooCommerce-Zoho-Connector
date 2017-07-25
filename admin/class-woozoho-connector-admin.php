@@ -49,7 +49,7 @@ class Woozoho_Connector_Admin {
 	 *
 	 * @param      string $plugin_name The name of this plugin.
 	 * @param      string $version The version of this plugin.
-	 * @param      ZohoConnector $client Client for the core of Zoho Connector.
+	 * @param      Woozoho_Connector_Zoho_Client $client Client for the core of Zoho Connector.
 	 */
 	public function __construct( $plugin_name, $version, $client ) {
 		$this->plugin_name = $plugin_name;
@@ -164,14 +164,14 @@ class Woozoho_Connector_Admin {
 
 	public static function woocommerce_update_settings() {
 		$oldOrderRecurrence = WC_Admin_Settings::get_option( "wc_zoho_connector_cron_orders_recurrence" );
-		ZohoConnector::writeDebug( "Settings", "Settings updated!" );
+		Woozoho_Connector_Zoho_Client::writeDebug( "Settings", "Settings updated!" );
 		$data = WC_Admin_Settings::get_option( "wc_zoho_connector_notify_email_option" );
-		ZohoConnector::writeDebug( "Settings",
+		Woozoho_Connector_Zoho_Client::writeDebug( "Settings",
 			"Settings data: " .
 			print_r( $data->zoho_sku, true ) );
 		woocommerce_update_options( self::get_settings() );
 		if ( $oldOrderRecurrence != WC_Admin_Settings::get_option( "wc_zoho_connector_cron_orders_recurrence" ) ) {
-			$cronJobs = new Woozoho_Connector_Cronjobs( new ZohoConnector() );
+			$cronJobs = new Woozoho_Connector_Cronjobs( new Woozoho_Connector_Zoho_Client() );
 			$cronJobs->updateOrdersJob( WC_Admin_Settings::get_option( "wc_zoho_connector_cron_orders_recurrence" ) );
 		}
 	}

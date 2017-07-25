@@ -34,7 +34,7 @@ class Woozoho_Connector_Cronjobs {
 	 *
 	 * @since    1.0.0
 	 * @access   protected
-	 * @var      ZohoConnector $client The string used to uniquely identify this plugin.
+	 * @var      Woozoho_Connector_Zoho_Client $client The string used to uniquely identify this plugin.
 	 */
 	protected $client;
 

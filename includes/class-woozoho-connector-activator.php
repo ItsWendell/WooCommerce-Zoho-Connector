@@ -31,7 +31,7 @@ class Woozoho_Connector_Activator {
 	 */
 	public static function activate() {
 		global $wpdb;
-		$client     = new ZohoConnector();
+		$client     = new Woozoho_Connector_Zoho_Client();
 		$table_name = $wpdb->prefix . 'woozoho_orders_tracker';
 		$client->writeDebug( "Install DB", "Activating plugin in " . $table_name );
 

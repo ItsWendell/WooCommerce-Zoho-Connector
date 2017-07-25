@@ -1,6 +1,6 @@
 <?php
 
-class ZohoClient {
+class Woozoho_Connector_Zoho_API {
 	public $organizationId;
 	public $accessToken;
 
