@@ -119,11 +119,11 @@ class Woozoho_Connector {
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-woozoho-connector-i18n.php';
 
 		//ZohoConnector Core Functionality
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-woozoho-connector-API.php';
+		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-woozoho-connector-zoho-api.php';
 
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-woozoho-connector-orders-queue.php';
 
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-woozoho-connector-core.php';
+		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-woozoho-connector-zoho-client.php';
 
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-woozoho-connector-cronjobs.php';
 
@@ -225,6 +225,10 @@ class Woozoho_Connector {
 		} else if ( ! $isEnabled && $cron_jobs->isOrdersJobRunning() ) {
 			$cron_jobs->stopOrdersJob();
 		}
+
+		$this->loader->add_action( 'woozoho_caching', $cron_jobs, 'startCaching' );
+
+
 	}
 
 	/**

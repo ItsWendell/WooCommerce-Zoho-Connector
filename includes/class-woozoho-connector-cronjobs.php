@@ -99,4 +99,8 @@ class Woozoho_Connector_Cronjobs {
 			$this->client->pushOrder( $order_id );
 		}
 	}
+
+	public function startCaching() {
+		$this->client->cacheItems();
+	}
 }

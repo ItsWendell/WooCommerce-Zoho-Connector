@@ -22,14 +22,17 @@ class Woozoho_Connector_Zoho_Client {
 	public $zohoAPI;
 	protected $logLocation = "./";
 	protected $apiItemsCachingLocation = "./cache/items.json";
-	protected $apiCachingTimeout;
+	protected $apiCachingItemsTimeout;
 
 	public function __construct() {
-		$args                    = array();
-		$args["accessToken"]     = WC_Admin_Settings::get_option( "wc_zoho_connector_token" );
-		$args["organizationId"]  = WC_Admin_Settings::get_option( "wc_zoho_connector_organisation_id" );
-		$this->apiCachingTimeout = strtotime( "+2 days" ); //Chaching beta.
+		$args                         = array();
+		$args["accessToken"]          = WC_Admin_Settings::get_option( "wc_zoho_connector_token" );
+		$args["organizationId"]       = WC_Admin_Settings::get_option( "wc_zoho_connector_organisation_id" );
+		$this->apiCachingItemsTimeout = WC_Admin_Settings::get_option( "wc_zoho_connector_api_cache_items" );
 		//TODO: Implement caching options.
+
+		$this->logLocation             = realpath( __DIR__ . DIRECTORY_SEPARATOR . '..' );
+		$this->apiItemsCachingLocation = $this->logLocation . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR . 'items.json';
 
 		$this->zohoAPI     = new Woozoho_Connector_Zoho_API( $args );
 		$this->ordersQueue = new Woozoho_Connector_Orders_Queue( $this );
@@ -81,57 +84,90 @@ class Woozoho_Connector_Zoho_Client {
 	 *
 	 * @return object|null
 	 */
-	public function getItem( $sku, $useCaching = false ) {
-		if ( $useCaching && $this->isItemsCached() ) {
-			//TODO: Search within cache.
-		} else {
-			//TODO: Schedule event for caching, until that is done, get live results.
+	public function getItem( $sku, $useCaching = true ) {
+		$isCachingEnabled = ( $this->apiCachingItemsTimeout != "disabled" ) ? true : false;
+		if ( $useCaching && $this->isItemsCached() && $isCachingEnabled ) { //Check if caching is enabled & valid
+			$this->writeDebug( "Caching", "Looking for SKU '$sku' in item cache." );
+			$cacheData = file_get_contents( $this->apiItemsCachingLocation );
+			$cache     = json_decode( $cacheData );
+			if ( $cache != null ) {
+				$dataColumn = array_column( $cache, 'sku' );
+				$key        = array_search( $sku, $dataColumn );
+				if ( $key !== false ) {
+					$this->writeDebug( "Caching", "Found SKU '$sku' in item cache at pos " . $key );
 
-			$args        = array();
-			$args["sku"] = $sku;
-			$data        = $this->zohoAPI->listItems( $args );
-			if ( $data->items ) {
-				return $data->items[0];
+					return $cache[ $key ];
+				}
 			} else {
-				return null;
+				$this->writeDebug( "Caching", "Item cache is invalid, continue using live API..." );
 			}
+		} else { //Caching not enabled
+			if ( ! $this->isItemsCached() && $isCachingEnabled ) { //Caching not filled or not valid anymore
+				$this->scheduleCaching();
+			}
+			$this->writeDebug( "Caching", "Item cache is not valid or disabled for this call, continue using live API..." );
 		}
 
-		$this->zohoAPI->listItems();
+		$args        = array();
+		$args["sku"] = $sku;
+		$data        = $this->zohoAPI->listItems( $args );
+		if ( $data->items ) {
+			return $data->items[0];
+		} else {
+			return null;
+		}
+	}
+
+	public function scheduleCaching() {
+		wp_schedule_single_event( time() + 5, 'woozoho_caching' );
 	}
 
 	public function isItemsCached() {
+		$this->writeDebug( "API Cache", "Checking if cache is valid." );
 		if ( file_exists( $this->apiItemsCachingLocation ) ) {
-			if ( filectime( $this->apiItemsCachingLocation ) < $this->apiCachingTimeout ) {
+			$fileTime   = filectime( $this->apiItemsCachingLocation );
+			$nowTime    = time();
+			$expireTime = strtotime( "+ " . $this->apiCachingItemsTimeout, $fileTime );
+
+			//$this->writeDebug("API Cache","File time: $fileTime, Expire Time: $expireTime, Now Time: $nowTime, Expire Time should be bigger than now time for cache to be valid.");
+			if ( $expireTime >= $nowTime ) {
+				$this->writeDebug( "API Cache", "Cache is still valid." );
 				return true;
 			} else {
+				$this->writeDebug( "API Cache", "Cache is outdated, removing..." );
+				unlink( $this->apiItemsCachingLocation ); //Removing expired cache.
 				return false;
 			}
 		} else {
+			$this->writeDebug( "API Cache", "No cache file is available." );
 			return false;
 		}
 	}
 
-	function getAllItems() {
+	public function getAllItems() {
 		$returnData = array();
 		$nextPage   = 1;
 
 		while ( $nextPage ) {
+			$this->writeDebug( "API Cache", "Getting all items... current page: " . $nextPage );
 			$args = array();
 			if ( $nextPage > 1 ) {
 				$args["page"] = $nextPage;
 			}
-			$resultData  = $this->zohoAPI->listItems( $args );
-			$hasNextPage = $resultData->items->page_context->has_more_page;
 
-			if ( count( $resultData->items->items ) >= 1 ) {
-				foreach ( $resultData->items->items as $item ) {
+			$resultData  = $this->zohoAPI->listItems( $args );
+			//TODO: Catch API return errors, retry cerain times.
+			$hasNextPage = $resultData->page_context->has_more_page;
+			if ( count( $resultData->items ) >= 1 ) {
+				foreach ( $resultData->items as $item ) {
 					$returnData[] = $item;
 				}
 			}
 
+			$this->writeDebug( "API Cache", "Items in memory: " . count( $returnData ) );
+
 			if ( $hasNextPage ) {
-				$nextPage = $resultData->items->page_context->page;
+				$nextPage ++;
 			} else {
 				$nextPage = false;
 			}
@@ -140,37 +176,27 @@ class Woozoho_Connector_Zoho_Client {
 		return $returnData;
 	}
 
-	function getChachedItems() {
-		$this->writeDebug( "API Caching - Items", "Listing all cached items..." );
-		$cache_file = $this->apiItemsCachingLocation;
-		$expires    = $this->apiCachingTimeout;
-		global $request_type, $purge_cache, $limit_reached, $request_limit;
+	public function cacheItems() {
+		$this->writeDebug( "API Cache", "Listing all cached items..." );
+		$cache_file   = $this->apiItemsCachingLocation;
+		$cache_folder = dirname( $cache_file );
 
-		if ( ! file_exists( $cache_file ) ) {
-
+		if ( ! is_dir( $cache_folder ) ) {
+			mkdir( $cache_folder );
 		}
 
-		// Check that the file is older than the expire time and that it's not empty
-		if ( filectime( $cache_file ) < $expires || file_get_contents( $cache_file ) == '' || $purge_cache && intval( $_SESSION['views'] ) <= $request_limit ) {
+		//Get all items
+		$itemsCache = $this->getAllItems();
 
-			// File is too old, refresh cache
-
-			//Get all items
-			$itemsCache = $this->getAllItems();
-
-			// Remove cache file on error to avoid writing wrong xml
-			if ( $itemsCache ) {
-				file_put_contents( $cache_file, $itemsCache );
+		if ( ! empty( $itemsCache ) ) {
+			if ( file_put_contents( $cache_file, json_encode( $itemsCache ) ) ) {
+				$this->writeDebug( "API Cache", "Sucessfully wrote items to cache." );
 			} else {
-				unlink( $cache_file );
+				$this->writeDebug( "API Cache", "Error something went wrong with writing to items cache, check file permissions!" );
 			}
 		} else {
-			// Fetch cache
-			$json_results = file_get_contents( $cache_file );
-			$request_type = 'JSON';
+			unlink( $cache_file );
 		}
-
-		return json_decode( $json_results );
 	}
 
 	public function sendNotificationEmail( $subject, $message ) {
@@ -423,7 +449,8 @@ class Woozoho_Connector_Zoho_Client {
 	public function writeDebug( $type, $data ) {
 		if ( WC_Admin_Settings::get_option( "wc_zoho_connector_debugging" ) ) {
 			$multisiteString = is_multisite() ? "[" . get_bloginfo( 'name' ) . "]" : ( "" ); //Multi-site support.
-			file_put_contents( '/home/mydoodev/mydoo.nl/wp-content/plugins/woozoho-connector/debug_log',
+			$logfile         = realpath( __DIR__ . '/..' ) . '/debug_log';
+			file_put_contents( $logfile,
 				$multisiteString . "[" . date( "Y-m-d H:i:s" ) . "] [" . $type . "] " . $data . "\n", FILE_APPEND );
 		}
 	}

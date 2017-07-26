@@ -547,12 +547,8 @@ class Woozoho_Connector_Zoho_API {
 
 		//MORE CRAP
 		curl_setopt( $this->_curlObject, CURLOPT_AUTOREFERER, true );
-		//curl_setopt($this->_curlObject, CURLAUTH_ANY, true);
-		//curl_setopt($this->_curlObject, CURLAUTH_ANYSAFE, true);
-
 		curl_setopt( $this->_curlObject, CURLOPT_SSL_VERIFYPEER, false );
 		curl_setopt( $this->_curlObject, CURLOPT_SSL_VERIFYHOST, false );
-
 		curl_setopt( $this->_curlObject, CURLOPT_VERBOSE, 1 );
 		$fp = fopen( dirname( __FILE__ ) . '/errorlog.txt', 'w' );
 		curl_setopt( $this->_curlObject, CURLOPT_STDERR, $fp );
