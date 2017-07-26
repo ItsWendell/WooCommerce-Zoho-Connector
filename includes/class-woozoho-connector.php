@@ -71,7 +71,7 @@ class Woozoho_Connector {
 	public function __construct() {
 
 		$this->plugin_name = 'woozoho-connector';
-		$this->version     = '0.1.1';
+		$this->version     = '0.2';
 
 		$this->load_dependencies();
 		$this->set_locale();
