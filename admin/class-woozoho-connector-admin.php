@@ -159,7 +159,7 @@ class Woozoho_Connector_Admin {
 
 
 	public function woocommerce_settings_tab() {
-		include_once 'admin.' . DIRECTORY_SEPARATOR . '.partials' . DIRECTORY_SEPARATOR . 'woozoho-connector-admin-display.php';
+		include_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin' . DIRECTORY_SEPARATOR . 'partials' . DIRECTORY_SEPARATOR . 'woozoho-connector-admin-display.php';
 	}
 
 	public function doAction( $action ) {
