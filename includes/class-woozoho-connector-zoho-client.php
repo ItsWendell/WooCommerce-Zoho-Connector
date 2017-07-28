@@ -81,12 +81,13 @@ class Woozoho_Connector_Zoho_Client {
 	 *
 	 * @param string $sku SKU code from product.
 	 * @param bool $useCaching Use build-in caching system.
+	 * @param bool $checkCaching check if caching is valid for this call.
 	 *
 	 * @return object|null
 	 */
-	public function getItem( $sku, $useCaching = true ) {
+	public function getItem( $sku, $useCaching = true, $checkCaching = false ) {
 		$isCachingEnabled = ( $this->apiCachingItemsTimeout != "disabled" ) ? true : false;
-		if ( $useCaching && $this->isItemsCached() && $isCachingEnabled ) { //Check if caching is enabled & valid
+		if ( $useCaching && ( $checkCaching ? $this->isItemsCached() : true ) && $isCachingEnabled ) { //Check if caching is enabled & valid
 			$this->writeDebug( "Caching", "Looking for SKU '$sku' in item cache." );
 			$cacheData = file_get_contents( $this->apiItemsCachingLocation );
 			$cache     = json_decode( $cacheData );
@@ -367,12 +368,19 @@ class Woozoho_Connector_Zoho_Client {
 			$missingProducts  = "";
 			$inactiveProducts = "";
 
+			$useCaching = true;
+
+			if ( ! $this->isItemsCached() ) {
+				$useCaching = false;
+				$this->scheduleCaching();
+			}
+
 			//Loop through each item.
 			foreach ( $items as $item ) {
 				if ( $item->get_product() ) {
 					if ( $item->get_product()->get_sku() ) {
 						$this->writeDebug( "Push Order", "Looking for product in zoho with SKU: " . $item->get_product()->get_sku() );
-						$zohoItem = $this->getItem( $item->get_product()->get_sku() );
+						$zohoItem = $this->getItem( $item->get_product()->get_sku(), $useCaching, false );
 						if ( ! $zohoItem ) {
 							$missingProducts .= $this->itemToNotes( $item );
 							$this->writeDebug( "Push Order", "Product (" . $item->get_product()->get_sku() . ") not found. Adding to notes." );
