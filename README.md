@@ -1,19 +1,15 @@
-# WooCommerce-Zoho-Connector
+# Connector for Woocommerce & Zoho
 A connector for WooCommerce To Zoho for Sales Orders
 
-# Roadmap v0.1 BETA
-Initial connector for 1 way multi-store, multi-site WooCommerce Sales Order To Zoho Sales Orders Connector.
- - Zoho Sales Order: Matching Clients Based on Emails.
- - Zoho Sales Order: Matching Products Based On EAN / Product Codes
+## Roadmap v1.0-BETA
+ - Push new orders to Zoho as draft or open Sales Order.
+ - Notification emails for specific errors and events.
+ - Automatically create contacts if don't exist
+ - Automatically create items if don't exist
+ - Manually sync all contacts to Zoho
+ - Manually sync all products to Zoho
+ - Orders queue to catch API defects
+ - API caching system for items (products)
  
- # Installation
-Next to installing this plugin the regular way into WordPRess, you need to setup your cron-jobs properly.
-This so your visitors won't be affected by the synchronizing between WooCommerce and Zoho.
+### Notes
 
- - wp-config.php: define('DISABLE_WP_CRON', true);
- - Google: How To Setup A Cron Job In [Your Server Configuration here. e.g. cPanel]
- - Set cronjob every 5 minutes to: /home/mydoodev/mydoo.nl/wp-cron.php
- - http://yourwebsite.com/wp-cron.php?doing_wp_cron
- 
- # Notes
- More features / roadmap comming soon!

@@ -171,6 +171,14 @@ class Woozoho_Connector_Admin {
 		}
 	}
 
+	public function scheduleOrder( $order_id ) {
+		if ( WC_Admin_Settings::get_option( "wc_zoho_connector_cron_orders_recurrence" ) == "directly" ) {
+			$this->client->scheduleOrder( $order_id );
+		} else {
+			$this->client->getOrdersQueue()->addOrder( $order_id );
+		}
+	}
+
 	public static function woocommerce_update_settings() {
 		$oldOrderRecurrence = WC_Admin_Settings::get_option( "wc_zoho_connector_cron_orders_recurrence" );
 		Woozoho_Connector_Zoho_Client::writeDebug( "Settings", "Settings updated!" );

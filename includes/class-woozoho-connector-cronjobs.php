@@ -9,25 +9,7 @@
  * @subpackage Woozoho_Connector/includes
  */
 
-/**
- * Initializing cron jobs for syncing to / from Zoho
- *
- * This class defines all code necessary to run during the plugin's deactivation.
- *
- * @since      1.0.0
- * @package    Woozoho_Connector
- * @subpackage Woozoho_Connector/includes
- * @author     Wendell Misiedjan <me@digispark.nl>
- */
 class Woozoho_Connector_Cronjobs {
-
-	/**
-	 * Short Description. (use period)
-	 *
-	 * Long Description.
-	 *
-	 * @since    1.0.0
-	 */
 
 	/**
 	 * The unique identifier of the client

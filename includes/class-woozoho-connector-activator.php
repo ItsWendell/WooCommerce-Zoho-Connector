@@ -31,6 +31,9 @@ class Woozoho_Connector_Activator {
 	 */
 	public static function activate() {
 		global $wpdb;
+		//TODO: Don't activate / run plugin if WooCommerce is not active.
+		//TODO: Implement version management for database
+		//TODO: Implement database update scripts (e.x. WooCommerce)
 		$client     = new Woozoho_Connector_Zoho_Client();
 		$table_name = $wpdb->prefix . 'woozoho_orders_tracker';
 		$client->writeDebug( "Install DB", "Activating plugin in " . $table_name );

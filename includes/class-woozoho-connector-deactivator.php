@@ -30,7 +30,7 @@ class Woozoho_Connector_Deactivator {
 	 * @since    1.0.0
 	 */
 	public static function deactivate() {
-
+		//TODO: Remove database on deactivation
 	}
 
 }
