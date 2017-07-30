@@ -166,7 +166,7 @@ class Woozoho_Connector_Admin {
 		switch ( $action ) {
 			case "clearcache": {
 				$this->client->writeDebug( "Action", "Regenerating caches..." );
-				$this->client->scheduleCaching();
+				$this->client->getCache()->scheduleCaching();
 			}
 		}
 	}

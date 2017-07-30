@@ -118,6 +118,8 @@ class Woozoho_Connector {
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-woozoho-connector-i18n.php';
 
 		//ZohoConnector Core Functionality
+		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-woozoho-connector-zoho-cache.php';
+
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-woozoho-connector-zoho-api.php';
 
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-woozoho-connector-orders-queue.php';

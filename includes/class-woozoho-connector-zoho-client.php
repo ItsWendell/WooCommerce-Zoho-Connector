@@ -16,32 +16,46 @@
  */
 class Woozoho_Connector_Zoho_Client {
 
-	protected $organizationId;
-	protected $accessToken;
 	protected $ordersQueue;
-	public $zohoAPI;
+	protected $cache;
+	protected $zohoAPI;
 	protected $logLocation = "./";
-	protected $apiItemsCachingLocation = "./cache/items.json";
 	protected $apiCachingItemsTimeout;
 
 	public function __construct() {
-		$args                         = array();
-		$args["accessToken"]          = WC_Admin_Settings::get_option( "wc_zoho_connector_token" );
-		$args["organizationId"]       = WC_Admin_Settings::get_option( "wc_zoho_connector_organisation_id" );
+		//API Settings
+		$args                   = array();
+		$args["accessToken"]    = WC_Admin_Settings::get_option( "wc_zoho_connector_token" );
+		$args["organizationId"] = WC_Admin_Settings::get_option( "wc_zoho_connector_organisation_id" );
 
-		//Caching
-		$this->apiCachingItemsTimeout = WC_Admin_Settings::get_option( "wc_zoho_connector_api_cache_items" );
-
+		//Variables
 		$this->logLocation             = realpath( __DIR__ . DIRECTORY_SEPARATOR . '..' );
-		$this->apiItemsCachingLocation = $this->logLocation . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR . 'items.json';
-		//TODO: Optimize caching system.
 
+		//Modules
 		$this->zohoAPI     = new Woozoho_Connector_Zoho_API( $args );
 		$this->ordersQueue = new Woozoho_Connector_Orders_Queue( $this );
+		$this->cache       = new Woozoho_Connector_Zoho_Cache( $this );
 	}
 
+	/**
+	 * @return Woozoho_Connector_Orders_Queue
+	 */
 	public function getOrdersQueue() {
 		return $this->ordersQueue;
+	}
+
+	/**
+	 * @return Woozoho_Connector_Zoho_Cache
+	 */
+	public function getCache() {
+		return $this->cache;
+	}
+
+	/**
+	 * @return Woozoho_Connector_Zoho_API
+	 */
+	public function getAPI() {
+		return $this->zohoAPI;
 	}
 
 	public function getContact( $contact_name, $email = false ) {
@@ -68,18 +82,6 @@ class Woozoho_Connector_Zoho_Client {
 		}
 	}
 
-	public function getSalesOrders( $user_id ) {
-		$args                = array();
-		$args["customer_id"] = $user_id;
-		$data                = $this->zohoAPI->listSalesOrders( $args );
-		if ( $data->salesorders ) {
-			return $data->salesorders;
-		} else {
-			return null;
-		}
-	}
-
-
 	/** Get Item By SKU live from API or using the build-in caching.
 	 *
 	 * @param string $sku SKU code from product.
@@ -89,25 +91,16 @@ class Woozoho_Connector_Zoho_Client {
 	 * @return object|null
 	 */
 	public function getItem( $sku, $useCaching = true, $checkCaching = false ) {
-		$isCachingEnabled = ( $this->apiCachingItemsTimeout != "disabled" ) ? true : false;
-		if ( $useCaching && ( $checkCaching ? $this->isItemsCached() : true ) && $isCachingEnabled ) { //Check if caching is enabled & valid
-			$this->writeDebug( "API Cache", "Looking for SKU '$sku' in item cache." );
-			//TODO: Create seperate class for caching?
-			$cacheData = file_get_contents( $this->apiItemsCachingLocation );
-			$cache     = json_decode( $cacheData );
-			if ( $cache != null ) {
-				$dataColumn = array_column( $cache, 'sku' );
-				$key        = array_search( $sku, $dataColumn );
-				if ( $key !== false ) {
-					$this->writeDebug( "API Cache", "Found SKU '$sku' in item cache at pos " . $key );
-					return $cache[ $key ];
-				}
+		if ( $useCaching && ( $checkCaching ? $this->getCache()->checkItemsCache() : true ) && $this->getCache()->isEnabled() ) { //Check if caching is enabled & valid
+			$item = $this->getCache()->getItem( $sku );
+			if ( $item ) {
+				return $item;
 			} else {
-				$this->writeDebug( "API Cache", "Item cache is invalid, continue using live API..." );
+				$this->writeDebug( "Get Item", "Item not found in cache, try live version?" );
 			}
 		} else { //Caching not enabled
-			if ( ! $this->isItemsCached() && $isCachingEnabled ) { //Caching not filled or not valid anymore
-				$this->scheduleCaching();
+			if ( ! $this->getCache()->checkItemsCache() && $this->getCache()->isEnabled() ) { //Caching not filled or not valid anymore
+				$this->getCache()->scheduleCaching();
 			}
 			$this->writeDebug( "API Cache", "Item cache is not valid or disabled for this call, continue using live API..." );
 		}
@@ -122,38 +115,12 @@ class Woozoho_Connector_Zoho_Client {
 		}
 	}
 
-	public function scheduleCaching() {
-		wp_schedule_single_event( time(), 'woozoho_caching' );
-	}
-
-	public function isItemsCached() {
-		$this->writeDebug( "API Cache", "Checking if cache is valid." );
-		if ( file_exists( $this->apiItemsCachingLocation ) ) {
-			$fileTime   = filectime( $this->apiItemsCachingLocation );
-			$nowTime    = time();
-			$expireTime = strtotime( "+ " . $this->apiCachingItemsTimeout, $fileTime );
-
-			//$this->writeDebug("API Cache","File time: $fileTime, Expire Time: $expireTime, Now Time: $nowTime, Expire Time should be bigger than now time for cache to be valid.");
-			if ( $expireTime >= $nowTime ) {
-				$this->writeDebug( "API Cache", "Cache is still valid." );
-				return true;
-			} else {
-				$this->writeDebug( "API Cache", "Cache is outdated, removing..." );
-				unlink( $this->apiItemsCachingLocation ); //Removing expired cache.
-				return false;
-			}
-		} else {
-			$this->writeDebug( "API Cache", "No cache file is available." );
-			return false;
-		}
-	}
-
 	public function getAllItems() {
 		$returnData = array();
 		$nextPage   = 1;
 
 		while ( $nextPage ) {
-			$this->writeDebug( "API Cache", "Getting all items... current page: " . $nextPage );
+			$this->writeDebug( "Zoho Client", "Getting all items... current page: " . $nextPage );
 			$args         = array();
 			$args["page"] = $nextPage;
 
@@ -166,7 +133,7 @@ class Woozoho_Connector_Zoho_Client {
 				}
 			}
 
-			$this->writeDebug( "API Cache", "Items in memory: " . count( $returnData ) );
+			$this->writeDebug( "Zoho Client", "Current item count: " . count( $returnData ) );
 
 			if ( $hasNextPage ) {
 				$nextPage ++;
@@ -174,31 +141,7 @@ class Woozoho_Connector_Zoho_Client {
 				break;
 			}
 		}
-
 		return $returnData;
-	}
-
-	public function cacheItems() {
-		$this->writeDebug( "API Cache", "Listing all cached items..." );
-		$cache_file   = $this->apiItemsCachingLocation;
-		$cache_folder = dirname( $cache_file );
-
-		if ( ! is_dir( $cache_folder ) ) {
-			mkdir( $cache_folder );
-		}
-
-		//Get all items
-		$itemsCache = $this->getAllItems();
-
-		if ( ! empty( $itemsCache ) ) {
-			if ( file_put_contents( $cache_file, json_encode( $itemsCache ) ) ) {
-				$this->writeDebug( "API Cache", "Sucessfully wrote items to cache." );
-			} else {
-				$this->writeDebug( "API Cache", "Error something went wrong with writing to items cache, check file permissions!" );
-			}
-		} else {
-			unlink( $cache_file );
-		}
 	}
 
 	public function sendNotificationEmail( $subject, $message ) {
@@ -371,12 +314,12 @@ class Woozoho_Connector_Zoho_Client {
 
 			$useCaching = true;
 
-			if ( ! $this->isItemsCached() ) {
+			if ( ! $this->getCache()->checkItemsCache( true ) ) {
 				$useCaching = false;
-				$this->scheduleCaching();
 			}
 
 			//Loop through each item.
+			/** @var WC_Order_Item $item */
 			foreach ( $items as $item ) {
 				if ( $item->get_product() ) {
 					if ( $item->get_product()->get_sku() ) {
@@ -401,9 +344,6 @@ class Woozoho_Connector_Zoho_Client {
 					} else {
 						$missingProducts .= $this->itemToNotes( $item );
 						$this->writeDebug( "Push Order", "Error: SKU not found of product ID: " . $item['product_id'] . ". Product is added as a note." );
-						if ( WC_Admin_Settings::get_option( "wc_zoho_connector_notify_email_option" )["sku_woocommerce"] ) {
-							$this->sendNotificationEmail( "SKU of Product  '" . $item['name'] . "' not found in WooCommerce.", "SKU of Product  '" . $item['name'] . "' (" . $item['product_id'] . ") not found in WooCommerce." );
-						}
 					}
 				} else {
 					$missingProducts .= $this->itemToNotes( $item );
@@ -411,9 +351,11 @@ class Woozoho_Connector_Zoho_Client {
 				}
 			}
 
+			//TODO: Find long term solution for empty sales.
 			if ( empty( $salesOrder["line_items"] ) ) {
 				$placeHolder = $this->itemConvert( $this->getItem( "PLACEHOLDER" ), false, 1 );
-				array_push( $salesOrder["line_items"], $placeHolder ); //TODO: Find long term solution for this.
+				array_push( $salesOrder["line_items"], $placeHolder );
+
 				$this->writeDebug( "Push Order", "Order is empty or no SKU's can't be found for Order ID: " . $order_id );
 			}
 
@@ -428,7 +370,7 @@ class Woozoho_Connector_Zoho_Client {
 
 			$orderComment = $missingProducts . "\n" . $inactiveProducts . "\nAutomatically generated by WooCommerce Zoho Connector.";
 
-			$salesOrderOutput = $this->zohoAPI->createSalesOrder( $salesOrder, ( WC_Admin_Settings::get_option( "wc_zoho_connector_testmode" ) == yes ) );
+			$salesOrderOutput = $this->zohoAPI->createSalesOrder( $salesOrder, ( WC_Admin_Settings::get_option( "wc_zoho_connector_testmode" ) == "yes" ) );
 
 			if ( ! $salesOrderOutput->salesorder ) {
 				$this->writeDebug( "Push Order", "Couldn't push $order_id to Zoho. Something went wrong with pushing the order data." );
@@ -475,8 +417,15 @@ class Woozoho_Connector_Zoho_Client {
 		if ( $timestamp ) {
 			wp_schedule_single_event( $timestamp, 'woozoho_push_order_queue', array( $post_id ) );
 		} else {
-			wp_schedule_single_event( time() + 5, 'woozoho_push_order_queue', array( $post_id ) );
+			wp_schedule_single_event( time(), 'woozoho_push_order_queue', array( $post_id ) );
 		}
+	}
+
+	/**
+	 * @return bool|string
+	 */
+	public function getLogLocation() {
+		return $this->logLocation;
 	}
 }
 

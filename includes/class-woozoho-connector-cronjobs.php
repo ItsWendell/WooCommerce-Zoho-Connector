@@ -76,13 +76,19 @@ class Woozoho_Connector_Cronjobs {
 		$this->client->writeDebug( "Cron Jobs", "Running orders cron job..." );
 		$ordersQueue = $this->client->getOrdersQueue()->getQueue();
 
-		foreach ( $ordersQueue as $order_id ) {
-			$this->client->writeDebug( "Cron Jobs", "Pushing Order ID: " . $order_id );
-			$this->client->pushOrder( $order_id );
+		if ( count( $ordersQueue ) >= 1 ) {
+			foreach ( $ordersQueue as $order_id ) {
+				$this->client->writeDebug( "Cron Jobs", "Pushing Order ID: " . $order_id );
+				$this->client->pushOrder( $order_id );
+			}
+		} else {
+			if ( $this->client->getCache()->isEnabled() ) {
+				$this->client->getCache()->checkItemsCache( true );
+			}
 		}
 	}
 
 	public function startCaching() {
-		$this->client->cacheItems();
+		$this->client->getCache()->cacheItems();
 	}
 }
