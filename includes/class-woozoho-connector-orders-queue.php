@@ -47,10 +47,7 @@ class Woozoho_Connector_Orders_Queue {
 			$wpdb->prepare(
 				"SELECT status FROM " . $wpdb->prefix . $this->dataTable . "
                     WHERE post_id = %d LIMIT 1",
-				$order_id
-			)
-		)
-		) {
+				$order_id ) ) ) {
 			if ( $wpdb->insert(
 				$wpdb->prefix . $this->dataTable,
 				array(
@@ -68,15 +65,12 @@ class Woozoho_Connector_Orders_Queue {
 					'%s',
 					'%d',
 					'%s'
-				)
-			)
-			) {
+				) ) ) {
 				Woozoho_Connector_Zoho_Client::writeDebug( "Orders Queue", "Sucessfully inserted '" . $order_id . "' into queue." );
 			} else {
 				Woozoho_Connector_Zoho_Client::writeDebug( "Orders Queue", "ERROR: Something went wrong with queuing '" . $order_id . "' into queue." );
 			}
-		}
-		{
+		} else {
 			Woozoho_Connector_Zoho_Client::writeDebug( "Orders Queue", "Order '" . $order_id . "' already exists in queue, skipping..." );
 		}
 	}

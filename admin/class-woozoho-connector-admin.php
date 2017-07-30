@@ -131,7 +131,7 @@ class Woozoho_Connector_Admin {
 		}
 
 		foreach ( $post_ids as $post_id ) {
-			$this->client->queueOrder( $post_id, false );
+			$this->client->scheduleOrder( $post_id, false );
 		}
 
 		$redirect_to = add_query_arg( 'bulk_send_zoho', count( $post_ids ), $redirect_to );
@@ -172,6 +172,12 @@ class Woozoho_Connector_Admin {
 	}
 
 	public function scheduleOrder( $order_id ) {
+		$hook = current_action();
+
+		if ( $hook == "woocommerce_new_order" ) {
+			$this->client->writeDebug( "WooCommerce", "A new order ($order_id) received." );
+		}
+
 		if ( WC_Admin_Settings::get_option( "wc_zoho_connector_cron_orders_recurrence" ) == "directly" ) {
 			$this->client->scheduleOrder( $order_id );
 		} else {

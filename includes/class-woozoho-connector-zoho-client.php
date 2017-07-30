@@ -276,7 +276,6 @@ class Woozoho_Connector_Zoho_Client {
 					$this->writeDebug( "Push Order", "Order " . $order_id . ": Can't create contact (" . $user_info->user_email . ") in Zoho. Updating order and continue." );
 					$this->ordersQueue->updateOrder( $order_id, "error", "Couldn't create contact in Zoho.", true );
 					$isQueued = true;
-
 					return false;
 				} else {
 					$this->writeDebug( "Push Order", "Order " . $order_id . ": Contact created for " . $order->get_billing_company() . " (" . $user_info->user_email . ") in Zoho." );
@@ -381,11 +380,20 @@ class Woozoho_Connector_Zoho_Client {
 
 			//Success
 			$this->ordersQueue->updateOrder( $order_id, "success", "Successfully pushed to Zoho.", true );
-			//TODO: Create error notes in Order (including setting?)
-			//TODO: Create setting for updating order status to specific default (completed)
+
+
+			//Push Order Notes
 			$order->add_order_note( "Successfully pushed order to Zoho. " . $salesOrderOutput->salesorder->salesorder_number . " (" . $salesOrderOutput->salesorder->customer_name . ")" );
 
+			//TODO: Create error notes in Order (including setting?)
+			//TODO: Create setting for updating order status to specific default (completed)
+
+			//Add Payment Method As Notes;
+			$paymentMethod = "Payment Method: " . $order->get_payment_method_title() . " (" . $order->get_payment_method() . ")";
+			$this->zohoAPI->createComment( $salesOrderOutput->salesorder->salesorder_id, $paymentMethod );
+
 			$this->zohoAPI->createComment( $salesOrderOutput->salesorder->salesorder_id, $orderComment ); //Adding missing / inactive products.
+
 
 			$this->writeDebug( "Push Order", "Successfully pushed $order_id to Zoho." );
 
@@ -414,7 +422,7 @@ class Woozoho_Connector_Zoho_Client {
 
 		$this->ordersQueue->addOrder( $post_id );
 
-		if ( $timestamp ) {
+		if ( $timestamp !== false ) {
 			wp_schedule_single_event( $timestamp, 'woozoho_push_order_queue', array( $post_id ) );
 		} else {
 			wp_schedule_single_event( time(), 'woozoho_push_order_queue', array( $post_id ) );
