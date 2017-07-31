@@ -26,9 +26,8 @@ class Woozoho_Connector_Cronjobs {
 	 * @since    1.0.0
 	 * @var
 	 */
-	public function __construct( $client ) {
+	public function __construct() {
 		//Define jobs
-		$this->client = $client;
 	}
 
 	public function setupOrdersJob() {

@@ -26,12 +26,13 @@ class Woozoho_Connector_Zoho_Cache {
 	/**
 	 * Woozoho_Connector_Zoho_Cache constructor.
 	 *
-	 * @param Woozoho_Connector_Zoho_Client $client
 	 */
-	public function __construct( $client ) {
+	public function __construct() {
+		global $woozoho_connector;
 		//Load settings
 		$this->apiCachingItemsTimeout = WC_Admin_Settings::get_option( "wc_zoho_connector_api_cache_items" );
 		$this->cacheLocation          = $client->getLogLocation() . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR;
+		$woozoho_connector->
 		$this->client                 = $client;
 	}
 

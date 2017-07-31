@@ -47,14 +47,8 @@ class Woozoho_Connector_Admin {
 	 *
 	 * @since    1.0.0
 	 *
-	 * @param      string $plugin_name The name of this plugin.
-	 * @param      string $version The version of this plugin.
-	 * @param      Woozoho_Connector_Zoho_Client $client Client for the core of Zoho Connector.
 	 */
-	public function __construct( $plugin_name, $version, $client ) {
-		$this->plugin_name = $plugin_name;
-		$this->version     = $version;
-		$this->client      = $client;
+	public function __construct() {
 	}
 
 	/**
