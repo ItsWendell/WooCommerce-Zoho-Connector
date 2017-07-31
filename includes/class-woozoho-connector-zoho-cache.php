@@ -77,10 +77,12 @@ class Woozoho_Connector_Zoho_Cache {
 		$fileName = $this->cacheLocation . "items.json";
 		if ( file_exists( $fileName ) ) {
 			$fileTime   = filectime( $fileName );
+			$nowTime    = time();
 			$expireTime = strtotime( "+ " . $this->apiCachingItemsTimeout, $fileTime );
 
-			//$this->writeDebug("API Cache","File time: $fileTime, Expire Time: $expireTime, Now Time: $nowTime, Expire Time should be bigger than now time for cache to be valid.");
-			if ( $expireTime >= time() ) {
+			//$this->client->writeDebug("API Cache","File time: $fileTime, Expire Time: $expireTime, Now Time: $nowTime, Expire Time should be bigger than now time for cache to be valid.");
+
+			if ( $expireTime >= $nowTime ) {
 				$this->client->writeDebug( "API Cache", "Cache is still valid." );
 
 				return true;
@@ -121,9 +123,14 @@ class Woozoho_Connector_Zoho_Cache {
 	}
 
 	public function getCachedItems() {
+		$folderTests = plugin_dir_path( __DIR__ );
+		$this->client->writeDebug( "Zoho Cache", "Folder Test: " . $folderTests );
 		$cacheData = file_get_contents( $this->cacheLocation . "items.json" );
 		if ( $cacheData ) {
-			return json_decode( $cacheData );
+			$returnData = json_decode( $cacheData );
+			$this->client->writeDebug( "Zoho Cache", "Items in cache: " . count( $returnData ) );
+
+			return $returnData;
 		} else {
 			return false;
 		}

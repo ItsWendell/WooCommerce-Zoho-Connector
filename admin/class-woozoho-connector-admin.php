@@ -165,6 +165,7 @@ class Woozoho_Connector_Admin {
 	public function doAction( $action ) {
 		switch ( $action ) {
 			case "clearcache": {
+				WC_Admin_Notices::add_custom_notice( 'woozoho_clear_cache_notice', "Clearing Zoho Connector cache in the background..." );
 				$this->client->writeDebug( "Action", "Regenerating caches..." );
 				$this->client->getCache()->scheduleCaching();
 			}
@@ -201,61 +202,81 @@ class Woozoho_Connector_Admin {
 
 	public static function get_settings() {
 		$settings = array(
-			'section_title'          => array(
-				'name' => __( 'Zoho Connector Settings', 'woozoho-connector' ),
+
+			array(
+				'name' => __( 'Zoho Connector Authentication', 'woozoho-connector' ),
 				'type' => 'title',
-				'desc' => '',
-				'id'   => 'wc_zoho_connector_section_title'
+				'desc' => 'Your Zoho API credentials for connecting WooCommerce to Zoho.',
+				'id'   => 'wc_zoho_connector_section_authentication'
 			),
-			'token'                  => array(
+
+			array(
 				'name' => __( 'Auth Token', 'woozoho-connector' ),
 				'type' => 'text',
 				'desc' => __( 'Generate a auth code here.', 'woozoho-connector' ),
 				'id'   => 'wc_zoho_connector_token'
 			),
-			'organisation_id'        => array(
+
+			array(
 				'name' => __( 'Organisation Id', 'woozoho-connector' ),
 				'type' => 'text',
 				'desc' => __( 'Find your organisation id here.', 'woozoho-connector' ),
 				'id'   => 'wc_zoho_connector_organisation_id'
 			),
-			'notify_email'           => array(
+
+			array( 'type' => 'sectionend', 'id' => 'wc_zoho_connector_section_authentication' ),
+
+			array(
+				'name' => __( 'Email Notifications', 'woozoho-connector' ),
+				'type' => 'title',
+				'desc' => 'Get a message or get notified when a certain thing happens.',
+				'id'   => 'wc_zoho_connector_section_mail_notifications'
+			),
+
+			array(
 				'name' => __( 'Notification Email', 'woozoho-connector' ),
 				'type' => 'text',
 				'desc' => __( 'Email where notifications and logs from synchronizing are sent too.', 'woozoho-connector' ),
 				'id'   => 'wc_zoho_connector_notify_email'
 			),
-			'notify_email_option'    => array(
-				'name'    => __( 'Notification Email Options', 'woozoho-connector' ),
-				'type'    => 'multiselect',
-				'desc'    => __( 'Where should emails be enabled?', 'woozoho-connector' ),
-				'options' => array(
-					'sku_woocommerce' => 'WooCommerce SKU not found.',
-					'sku_zoho'        => 'Zoho SKU not found.',
-					'new_user'        => 'New user has been created.',
-					'zoho_error_user' => 'Cant create zoho user.',
-				),
-				'id'      => 'wc_zoho_connector_notify_email_option'
+
+			array(
+				'title'         => __( 'Notification Email Options', 'woozoho-connector' ),
+				'desc'          => __( 'When an order failed to sync.', 'woozoho-connector' ),
+				'id'            => 'wc_zoho_connector_email_notifications_failed_order',
+				'default'       => 'no',
+				'type'          => 'checkbox',
+				'checkboxgroup' => 'start',
+				'desc_tip'      => __( 'Send a notification when a order failed to sync to zoho.', 'woozoho-connector' ),
 			),
-			'debugging'              => array(
-				'name' => __( 'Debugging', 'woozoho-connector' ),
-				'type' => 'checkbox',
-				'desc' => __( 'Enable debugging in logfile?', 'woozoho-connector' ),
-				'id'   => 'wc_zoho_connector_debugging'
+
+			array(
+				'desc'          => __( 'A new contact is created in Zoho.', 'woocommerce' ),
+				'id'            => 'wc_zoho_connector_email_notifications_new_contact',
+				'default'       => 'no',
+				'type'          => 'checkbox',
+				'desc_tip'      => __( 'Send a notification when the connector finds no existing contact and creates a new one.', 'woozoho-connector' ),
+				'checkboxgroup' => 'end',
+				'autoload'      => false,
 			),
-			'testmode'               => array(
-				'name' => __( 'Test mode', 'woozoho-connector' ),
-				'type' => 'checkbox',
-				'desc' => __( 'Enable testmode?', 'woozoho-connector' ),
-				'id'   => 'wc_zoho_connector_testmode'
+
+			array( 'type' => 'sectionend', 'id' => 'wc_zoho_connector_section_mail_notifications' ),
+
+			array(
+				'name' => __( 'Cron Jobs', 'woozoho-connector' ),
+				'type' => 'title',
+				'desc' => 'Settings for synchronisation cron jobs.',
+				'id'   => 'wc_zoho_connector_section_cronjobs'
 			),
-			'cron_orders_enabled'    => array(
+
+			array(
 				'name' => __( 'Enable Orders Cron', 'woozoho-connector' ),
 				'type' => 'checkbox',
 				'desc' => __( 'Automatically sync orders to zoho?', 'woozoho-connector' ),
 				'id'   => 'wc_zoho_connector_cron_orders_enabled'
 			),
-			'cron_orders_recurrence' => array(
+
+			array(
 				'name'    => __( 'Syncing Orders', 'woozoho-connector' ),
 				'type'    => 'select',
 				'options' => array(
@@ -267,14 +288,39 @@ class Woozoho_Connector_Admin {
 				'desc'    => __( 'How often should orders be synced?', 'woozoho-connector' ),
 				'id'      => 'wc_zoho_connector_cron_orders_recurrence'
 			),
-			'orders_queue_max_tries' => array(
+
+			array(
 				'name'    => __( 'Orders Queue Max Tries', 'woozoho-connector' ),
 				'type'    => 'text',
-				'default' => '3',
+				'default' => '10',
 				'desc'    => __( 'How often should we try to push orders?', 'woozoho-connector' ),
 				'id'      => 'wc_zoho_connector_orders_queue_max_tries'
 			),
-			'api_cache_items'        => array(
+
+			array( 'type' => 'sectionend', 'id' => 'wc_zoho_connector_section_cronjobs' ),
+
+			array(
+				'name' => __( 'Advanced Settings', 'woozoho-connector' ),
+				'type' => 'title',
+				'desc' => 'Enable / disable debugging, test-mode, caching and more!',
+				'id'   => 'wc_zoho_connector_section_advanced_settings'
+			),
+
+			array(
+				'name' => __( 'Debugging', 'woozoho-connector' ),
+				'type' => 'checkbox',
+				'desc' => __( 'Enable debugging in logfile?', 'woozoho-connector' ),
+				'id'   => 'wc_zoho_connector_debugging'
+			),
+
+			array(
+				'name' => __( 'Test mode', 'woozoho-connector' ),
+				'type' => 'checkbox',
+				'desc' => __( 'Enable testmode?', 'woozoho-connector' ),
+				'id'   => 'wc_zoho_connector_testmode'
+			),
+
+			array(
 				'name'    => __( 'API Caching for Items', 'woozoho-connector' ),
 				'type'    => 'select',
 				'options' => array(
@@ -288,9 +334,10 @@ class Woozoho_Connector_Admin {
 				'desc'    => __( 'How long is caching valid?', 'woozoho-connector' ),
 				'id'      => 'wc_zoho_connector_api_cache_items'
 			),
-			'section_end'            => array(
+
+			array(
 				'type' => 'sectionend',
-				'id'   => 'wc_zoho_connector_section_end'
+				'id'   => 'wc_zoho_connector_section_advanced_settings'
 			)
 		);
 
