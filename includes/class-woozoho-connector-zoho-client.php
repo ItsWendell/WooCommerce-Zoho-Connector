@@ -29,12 +29,12 @@ class Woozoho_Connector_Zoho_Client {
 		$args["organizationId"] = WC_Admin_Settings::get_option( "wc_zoho_connector_organisation_id" );
 
 		//Variables
-		$this->logLocation             = realpath( __DIR__ . DIRECTORY_SEPARATOR . '..' );
+		$this->logLocation = realpath( __DIR__ . DIRECTORY_SEPARATOR . '..' );
 
 		//Modules
 		$this->zohoAPI     = new Woozoho_Connector_Zoho_API( $args );
-		$this->ordersQueue = new Woozoho_Connector_Orders_Queue( $this );
-		$this->cache       = new Woozoho_Connector_Zoho_Cache( $this );
+		$this->ordersQueue = new Woozoho_Connector_Orders_Queue();
+		$this->cache       = new Woozoho_Connector_Zoho_Cache();
 	}
 
 	/**
@@ -45,17 +45,219 @@ class Woozoho_Connector_Zoho_Client {
 	}
 
 	/**
-	 * @return Woozoho_Connector_Zoho_Cache
-	 */
-	public function getCache() {
-		return $this->cache;
-	}
-
-	/**
 	 * @return Woozoho_Connector_Zoho_API
 	 */
 	public function getAPI() {
 		return $this->zohoAPI;
+	}
+
+	public function getAllItems() {
+		$returnData = array();
+		$nextPage   = 1;
+
+		while ( $nextPage ) {
+			Woozoho_Connector_Logger::writeDebug( "Zoho Client", "Getting all items... current page: " . $nextPage );
+			$args         = array();
+			$args["page"] = $nextPage;
+
+			$resultData = $this->zohoAPI->listItems( $args );
+			//TODO: Catch API return errors, retry certain times.
+			$hasNextPage = $resultData->page_context->has_more_page;
+			if ( $resultData->items ) {
+				foreach ( $resultData->items as $item ) {
+					$returnData[] = $item;
+				}
+			}
+
+			Woozoho_Connector_Logger::writeDebug( "Zoho Client", "Current item count " . count( $returnData ) );
+
+			if ( $hasNextPage ) {
+				$nextPage ++;
+			} else {
+				break;
+			}
+		}
+
+		return $returnData;
+	}
+
+	public function sendNotificationEmail( $subject, $message ) {
+		//TODO: Add multisite support
+		$mailTo = WC_Admin_Settings::get_option( "wc_zoho_connector_notify_email" );
+		if ( $mailTo ) {
+			$headers[] = 'From: WordPress Zoho Connector <wordpress@mydoo.nl>';
+			$headers[] = 'Content-Type: text/html; charset=UTF-8';
+			wp_mail( $mailTo, "WooCommerce Zoho Connector:" . $subject, $message, $headers );
+			Woozoho_Connector_Logger::writeDebug( "Notification Email", "Email with subject '" . $subject . " sent to " . $mailTo );
+		}
+	}
+
+	public function processQueue() {
+		$ordersData = $this->ordersQueue->getQueue();
+		foreach ( $ordersData as $order_id ) {
+			$this->pushOrder( $order_id );
+		}
+	}
+
+	/**
+	 * @param $order_id
+	 *
+	 * @return bool
+	 *
+	 * Dynamic pricing updates notes:
+	 *  - If preference is set to WooCommerce;
+	 *    - Schedule a new event?
+	 *    - Update products
+	 *
+	 * - If preference is set to Zoho;
+	 *   - Update woocommerce order and products AFTER being pushed.
+	 */
+	public function pushOrder( $order_id ) {
+		//TODO: Cleanup / breakdown this entire function.
+		try {
+			$order = new WC_Order( $order_id );
+			if ( empty( $order->user_id ) ) {
+				throw new Exception( "User id not found." );
+			}
+			$order_user_id = $order->user_id;
+			$user_info     = get_userdata( $order_user_id );
+			$items         = $order->get_items();
+			$salesOrder    = array();
+
+			Woozoho_Connector_Logger::writeDebug( "Push Order", "Syncing Zoho Order ID " . $order_id . " from (" . $user_info->user_email . "): " );
+
+			$contact = $this->getContact( $order->get_billing_company(), $user_info->user_email );
+
+			if ( ! $contact ) {
+				Woozoho_Connector_Logger::writeDebug( "Push Order", "Contact " . $order->get_billing_company() . " (" . $user_info->user_email . ") for Order " . $order_id . " doesn't exist in Zoho. Creating contact..." );
+				$contact = $this->createContact( $user_info, $order );
+				if ( ! $contact ) {
+					throw new Exception( "Couldn't create contact ($user_info->user_email) in Zoho." );
+				} else {
+					Woozoho_Connector_Logger::writeDebug( "Push Order", "Order " . $order_id . ": Contact created for " . $order->get_billing_company() . " (" . $user_info->user_email . ") in Zoho." );
+				}
+			} else {
+				Woozoho_Connector_Logger::writeDebug( "Push Order", "Successfully found contact for " . $order->get_billing_company() . " (" . $user_info->user_email . ")." );
+			}
+
+			Woozoho_Connector_Logger::writeDebug( "Push Order", "Generating output to Zoho..." );
+
+			$salesOrder["customer_id"]   = $contact->contact_id;
+			$salesOrder["customer_name"] = $contact->company_name;
+
+			if ( WC_Admin_Settings::get_option( "wc_zoho_connector_testmode" ) == "yes" ) {
+				Woozoho_Connector_Logger::writeDebug( "Push Order", "TEST MODE IS ENABLED, USING TEST ORDER ID's." );
+				$salesOrder["salesorder_number"] = "TEST-" . $order_id;
+			} else {
+				Woozoho_Connector_Logger::writeDebug( "Push Order", "LIVE MODE ENABLED." );
+			}
+
+
+			$salesOrder["date"] = date( 'Y-m-d' );
+
+			if ( is_multisite() ) { //Support for multi-site, adding site id after reference number.
+				$salesOrder["reference_number"] = "WP-" . $order_id . "-" . get_current_blog_id();
+			} else {
+				$salesOrder["reference_number"] = "WP-" . $order_id;
+			}
+
+			$salesOrder["line_items"] = array();
+			$salesOrder["status"]     = "draft";
+
+			$missingProducts  = "";
+			$inactiveProducts = "";
+
+			$useCaching = true;
+
+			if ( ! $this->getCache()->checkItemsCache( true ) ) {
+				$useCaching = false;
+			}
+
+			//Loop through each item.
+			/** @var WC_Order_Item_Product $item */
+			foreach ( $items as $item ) {
+				if ( $item->get_product() ) {
+					if ( $item->get_product()->get_sku() ) {
+						Woozoho_Connector_Logger::writeDebug( "Push Order", "Looking for product in zoho with SKU: " . $item->get_product()->get_sku() );
+						$zohoItem = $this->getItem( $item->get_product()->get_sku(), $useCaching, false );
+						if ( ! $zohoItem ) {
+							if ( WC_Admin_Settings::get_option( "wc_zoho_connector_create_items" ) == 'yes' ) {
+								//TODO: Create item in Zoho.
+							} else {
+								$missingProducts .= $this->itemToNotes( $item );
+								Woozoho_Connector_Logger::writeDebug( "Push Order", "Product (" . $item->get_product()->get_sku() . ") not found. Adding to notes." );
+							}
+						} else {
+							if ( $zohoItem->status == "active" ) {
+								$line_item = $this->itemConvert( $zohoItem, $item );
+								array_push( $salesOrder["line_items"], $line_item );
+								Woozoho_Connector_Logger::writeDebug( "Push Order", "Product " . $item->get_product()->get_sku() . " successfully found." );
+							} else {
+								Woozoho_Connector_Logger::writeDebug( "Push Order", "Product " . $item->get_product()->get_sku() . " is inactive, added to notes." );
+								$inactiveProducts .= $this->itemToNotes( $item );
+							}
+						}
+					} else {
+						$missingProducts .= $this->itemToNotes( $item );
+						Woozoho_Connector_Logger::writeDebug( "Push Order", "Error: SKU not found of product ID: " . $item['product_id'] . ". Product is added as a note." );
+					}
+				} else {
+					$missingProducts .= $this->itemToNotes( $item );
+					Woozoho_Connector_Logger::writeDebug( "Push Order", "Error: Product (" . $item['name'] . ") not found in WooCommerce, so we can't find SKU. Product is added as a note." );
+				}
+			}
+
+			//TODO: Find long term solution for empty sales.
+			if ( empty( $salesOrder["line_items"] ) ) {
+				$placeHolder = $this->itemConvert( $this->getItem( "PLACEHOLDER" ), false, 1 );
+				array_push( $salesOrder["line_items"], $placeHolder );
+
+				Woozoho_Connector_Logger::writeDebug( "Push Order", "Order is empty or no SKU's can't be found for Order ID: " . $order_id );
+			}
+
+			//Handle Notes
+			if ( ! empty( $missingProducts ) ) {
+				$missingProducts = "Missing products:\n" . $missingProducts;
+			}
+
+			if ( ! empty( $inactiveProducts ) ) {
+				$inactiveProducts = "Inactive products:\n" . $inactiveProducts;
+			}
+
+			$orderComment = $missingProducts . "\n" . $inactiveProducts . "\nAutomatically generated by WooCommerce Zoho Connector.";
+
+			$salesOrderOutput = $this->zohoAPI->createSalesOrder( $salesOrder, ( WC_Admin_Settings::get_option( "wc_zoho_connector_testmode" ) == "yes" ) );
+
+			if ( ! $salesOrderOutput->salesorder ) {
+				throw new Exception( "Unable to push sales order to Zoho, invalid return." );
+			}
+
+			//Success
+			$this->ordersQueue->updateOrder( $order_id, "success", "Successfully pushed to Zoho.", true );
+
+			//Push Order Notes
+			$order->add_order_note( "Successfully pushed order to Zoho. " . $salesOrderOutput->salesorder->salesorder_number . " (" . $salesOrderOutput->salesorder->customer_name . ")" );
+
+			//TODO: Create error notes in Order (including setting?)
+			//TODO: Create setting for updating order status to specific default (completed)
+
+			//Add Payment Method As Notes;
+			$paymentMethod = "Payment Method: " . $order->get_payment_method_title() . " (" . $order->get_payment_method() . ")";
+			$this->zohoAPI->createComment( $salesOrderOutput->salesorder->salesorder_id, $paymentMethod );
+
+			$this->zohoAPI->createComment( $salesOrderOutput->salesorder->salesorder_id, $orderComment ); //Adding missing / inactive products.
+
+
+			Woozoho_Connector_Logger::writeDebug( "Push Order", "Successfully pushed $order_id to Zoho." );
+
+			return true;
+
+		} catch ( Exception $e ) {
+			$this->ordersQueue->updateOrder( $order_id, "error", $e->getMessage(), true );
+			Woozoho_Connector_Logger::writeDebug( "Push Order", "ERROR (Order ID: $order_id): " . $e->getMessage() );
+
+			return false;
+		}
 	}
 
 	public function getContact( $contact_name, $email = false ) {
@@ -79,79 +281,6 @@ class Woozoho_Connector_Zoho_Client {
 			}
 		} else {
 			return null;
-		}
-	}
-
-	/** Get Item By SKU live from API or using the build-in caching.
-	 *
-	 * @param string $sku SKU code from product.
-	 * @param bool $useCaching Use build-in caching system.
-	 * @param bool $checkCaching check if caching is valid for this call.
-	 *
-	 * @return object|null
-	 */
-	public function getItem( $sku, $useCaching = true, $checkCaching = false ) {
-		if ( $useCaching && ( $checkCaching ? $this->getCache()->checkItemsCache() : true ) && $this->getCache()->isEnabled() ) { //Check if caching is enabled & valid
-			$item = $this->getCache()->getItem( $sku );
-			if ( $item ) {
-				return $item;
-			} else {
-				$this->writeDebug( "Get Item", "Item not found in cache, try live version?" );
-			}
-		} else { //Caching not enabled
-			if ( ! $this->getCache()->checkItemsCache() && $this->getCache()->isEnabled() ) { //Caching not filled or not valid anymore
-				$this->getCache()->scheduleCaching();
-			}
-			$this->writeDebug( "API Cache", "Item cache is not valid or disabled for this call, continue using live API..." );
-		}
-
-		$args        = array();
-		$args["sku"] = $sku;
-		$data        = $this->zohoAPI->listItems( $args );
-		if ( $data->items ) {
-			return $data->items[0];
-		} else {
-			return null;
-		}
-	}
-
-	public function getAllItems() {
-		$returnData = array();
-		$nextPage   = 1;
-
-		while ( $nextPage ) {
-			$this->writeDebug( "Zoho Client", "Getting all items... current page: " . $nextPage );
-			$args         = array();
-			$args["page"] = $nextPage;
-
-			$resultData  = $this->zohoAPI->listItems( $args );
-			//TODO: Catch API return errors, retry cerain times.
-			$hasNextPage = $resultData->page_context->has_more_page;
-			if ( count( $resultData->items ) >= 1 ) {
-				foreach ( $resultData->items as $item ) {
-					$returnData[] = $item;
-				}
-			}
-
-			$this->writeDebug( "Zoho Client", "Current item count: " . count( $returnData ) );
-
-			if ( $hasNextPage ) {
-				$nextPage ++;
-			} else {
-				break;
-			}
-		}
-		return $returnData;
-	}
-
-	public function sendNotificationEmail( $subject, $message ) {
-		//TODO: Add multisite support
-		$mailTo = WC_Admin_Settings::get_option( "wc_zoho_connector_notify_email" );
-		if ( $mailTo ) {
-			$headers[] = 'From: WordPress Zoho Connector <wordpress@mydoo.nl>';
-			$headers[] = 'Content-Type: text/html; charset=UTF-8';
-			wp_mail( $mailTo, "WooCommerce Zoho Connector:" . $subject, $message, $headers );
-			$this->writeDebug( "Notification Email", "Email with subject '" . $subject . " sent to " . $mailTo );
 		}
 	}
 
@@ -211,32 +340,49 @@ class Woozoho_Connector_Zoho_Client {
 		}
 	}
 
-	public function processQueue() {
-		$ordersData = $this->ordersQueue->getQueue();
-		foreach ( $ordersData as $order_id ) {
-			$this->pushOrder( $order_id );
+	/** Get Item By SKU live from API or using the build-in caching.
+	 *
+	 * @param string $sku SKU code from product.
+	 * @param bool $useCaching Use build-in caching system.
+	 * @param bool $checkCaching check if caching is valid for this call.
+	 *
+	 * @return object|null
+	 */
+	public function getItem( $sku, $useCaching = true, $checkCaching = false ) {
+		if ( $useCaching && ( $checkCaching ? $this->getCache()->checkItemsCache() : true ) && $this->getCache()->isEnabled() ) { //Check if caching is enabled & valid
+			$item = $this->cache->getItem( $sku );
+			if ( $item ) {
+				return $item;
+			}
+		} else { //Caching not enabled or valid
+			if ( ! $this->cache->checkItemsCache() && $this->cache->isEnabled() ) { //Caching not filled or not valid anymore
+				$this->cache->scheduleCaching();
+			}
 		}
-	}
 
-	public function itemConvert( $zohoItem, $storeItem, $quantity = 0 ) {
-		$convertedItem = array(
-			"item_id"     => $zohoItem->item_id,
-			"rate"        => $zohoItem->rate,
-			"name"        => $zohoItem->name,
-			"description" => $zohoItem->description,
-			"tax_id"      => $zohoItem->tax_id,
-			"unit"        => $zohoItem->unit,
-		);
-
-		if ( $storeItem == false && $quantity != 0 ) {
-			$convertedItem["quantity"] = $quantity;
+		Woozoho_Connector_Logger::writeDebug( "Zoho Client", "Looking for product $sku using API." );
+		$args        = array();
+		$args["sku"] = $sku;
+		$data        = $this->zohoAPI->listItems( $args );
+		if ( $data->items ) {
+			return $data->items[0];
 		} else {
-			$convertedItem["quantity"] = $storeItem->get_quantity();
+			return null;
 		}
-
-		return $convertedItem;
 	}
 
+	/**
+	 * @return Woozoho_Connector_Zoho_Cache
+	 */
+	public function getCache() {
+		return $this->cache;
+	}
+
+	/**
+	 * @param WC_Order_Item_Product $item
+	 *
+	 * @return string
+	 */
 	public function itemToNotes( $item ) {
 		$returnString = "";
 		$returnString .= $item['name'] . " ";
@@ -251,171 +397,26 @@ class Woozoho_Connector_Zoho_Client {
 	}
 
 	/**
-	 * @param $order_id
+	 * @param $zohoItem
+	 * @param WC_Order_Item_Product|bool $storeItem
+	 * @param int $quantity
 	 *
-	 * @return bool
+	 * @return array
 	 */
-	public function pushOrder( $order_id ) {
-		//TODO: Cleanup / breakdown this entire function.
-		$isQueued = false;
-		try {
-			$order         = new WC_Order( $order_id );
-			$order_user_id = $order->user_id;
-			$user_info     = get_userdata( $order_user_id );
-			$items         = $order->get_items();
-			$salesOrder    = array();
+	public function itemConvert( $zohoItem, $storeItem, $quantity = 0 ) {
+		$convertedItem = array(
+			"item_id"     => $zohoItem->item_id,
+			"rate"        => ( WC_Admin_Settings::get_option( "wc_zoho_connector_pricing" ) == "zoho" || ! $storeItem ) ?
+				$zohoItem->rate : $storeItem->get_total(),
+			"name"        => $zohoItem->name,
+			"description" => $zohoItem->description,
+			"tax_id"      => $zohoItem->tax_id,
+			"unit"        => $zohoItem->unit,
+			"quantity"    => ( $quantity != 0 || ! $storeItem ) ?
+				$quantity : $storeItem->get_quantity()
+		);
 
-			$this->writeDebug( "Push Order", "Syncing Zoho Order ID " . $order_id . " from (" . $user_info->user_email . "): " );
-
-			$contact = $this->getContact( $order->get_billing_company(), $user_info->user_email );
-
-			if ( ! $contact ) {
-				$this->writeDebug( "Push Order", "Contact " . $order->get_billing_company() . " (" . $user_info->user_email . ") for Order " . $order_id . " doesn't exist in Zoho. Creating contact..." );
-				$contact = $this->createContact( $user_info, $order );
-				if ( ! $contact ) {
-					$this->writeDebug( "Push Order", "Order " . $order_id . ": Can't create contact (" . $user_info->user_email . ") in Zoho. Updating order and continue." );
-					$this->ordersQueue->updateOrder( $order_id, "error", "Couldn't create contact in Zoho.", true );
-					$isQueued = true;
-					return false;
-				} else {
-					$this->writeDebug( "Push Order", "Order " . $order_id . ": Contact created for " . $order->get_billing_company() . " (" . $user_info->user_email . ") in Zoho." );
-				}
-			} else {
-				$this->writeDebug( "Push Order", "Successfully found contact for " . $order->get_billing_company() . " (" . $user_info->user_email . ")." );
-			}
-
-			$this->writeDebug( "Push Order", "Generating output to Zoho..." );
-
-			$salesOrder["customer_id"]   = $contact->contact_id;
-			$salesOrder["customer_name"] = $contact->company_name;
-
-			if ( WC_Admin_Settings::get_option( "wc_zoho_connector_testmode" ) == "yes" ) {
-				$this->writeDebug( "Push Order", "TEST MODE IS ENABLED, USING TEST ORDER ID's." );
-				$salesOrder["salesorder_number"] = "TEST-" . $order_id;
-			} else {
-				$this->writeDebug( "Push Order", "LIVE MODE ENABLED." );
-			}
-
-
-			$salesOrder["date"] = date( 'Y-m-d' );
-
-			if ( is_multisite() ) { //Support for multi-site, adding site id after reference number.
-				$salesOrder["reference_number"] = "WP-" . $order_id . "-" . get_current_blog_id();
-			} else {
-				$salesOrder["reference_number"] = "WP-" . $order_id;
-			}
-
-			$salesOrder["line_items"] = array();
-			$salesOrder["status"]     = "draft";
-
-			$missingProducts  = "";
-			$inactiveProducts = "";
-
-			$useCaching = true;
-
-			if ( ! $this->getCache()->checkItemsCache( true ) ) {
-				$useCaching = false;
-			}
-
-			//Loop through each item.
-			/** @var WC_Order_Item $item */
-			foreach ( $items as $item ) {
-				if ( $item->get_product() ) {
-					if ( $item->get_product()->get_sku() ) {
-						$this->writeDebug( "Push Order", "Looking for product in zoho with SKU: " . $item->get_product()->get_sku() );
-						$zohoItem = $this->getItem( $item->get_product()->get_sku(), $useCaching, false );
-						if ( ! $zohoItem ) {
-							$missingProducts .= $this->itemToNotes( $item );
-							$this->writeDebug( "Push Order", "Product (" . $item->get_product()->get_sku() . ") not found. Adding to notes." );
-							if ( WC_Admin_Settings::get_option( "wc_zoho_connector_notify_email_option" )["sku_zoho"] ) {
-								$this->sendNotificationEmail( "SKU '" . $item->get_product()->get_sku() . "' not found in Zoho.", "SKU '" . $item->get_product()->get_sku() . "' not found in Zoho." );
-							}
-						} else {
-							if ( $zohoItem->status == "active" ) {
-								$line_item = $this->itemConvert( $zohoItem, $item );
-								array_push( $salesOrder["line_items"], $line_item );
-								$this->writeDebug( "Push Order", "Product " . $item->get_product()->get_sku() . " successfully found." );
-							} else {
-								$this->writeDebug( "Push Order", "Product " . $item->get_product()->get_sku() . " is inactive, added to notes." );
-								$inactiveProducts .= $this->itemToNotes( $item );
-							}
-						}
-					} else {
-						$missingProducts .= $this->itemToNotes( $item );
-						$this->writeDebug( "Push Order", "Error: SKU not found of product ID: " . $item['product_id'] . ". Product is added as a note." );
-					}
-				} else {
-					$missingProducts .= $this->itemToNotes( $item );
-					$this->writeDebug( "Push Order", "Error: Product (" . $item['name'] . ") not found in WooCommerce, so we can't find SKU. Product is added as a note." );
-				}
-			}
-
-			//TODO: Find long term solution for empty sales.
-			if ( empty( $salesOrder["line_items"] ) ) {
-				$placeHolder = $this->itemConvert( $this->getItem( "PLACEHOLDER" ), false, 1 );
-				array_push( $salesOrder["line_items"], $placeHolder );
-
-				$this->writeDebug( "Push Order", "Order is empty or no SKU's can't be found for Order ID: " . $order_id );
-			}
-
-			//Handle Notes
-			if ( ! empty( $missingProducts ) ) {
-				$missingProducts = "Missing products:\n" . $missingProducts;
-			}
-
-			if ( ! empty( $inactiveProducts ) ) {
-				$inactiveProducts = "Inactive products:\n" . $inactiveProducts;
-			}
-
-			$orderComment = $missingProducts . "\n" . $inactiveProducts . "\nAutomatically generated by WooCommerce Zoho Connector.";
-
-			$salesOrderOutput = $this->zohoAPI->createSalesOrder( $salesOrder, ( WC_Admin_Settings::get_option( "wc_zoho_connector_testmode" ) == "yes" ) );
-
-			if ( ! $salesOrderOutput->salesorder ) {
-				$this->writeDebug( "Push Order", "Couldn't push $order_id to Zoho. Something went wrong with pushing the order data." );
-				$this->ordersQueue->updateOrder( $order_id, "error", "Something went wrong with pushing the order data.", true );
-
-				return false;
-			}
-
-			//Success
-			$this->ordersQueue->updateOrder( $order_id, "success", "Successfully pushed to Zoho.", true );
-
-
-			//Push Order Notes
-			$order->add_order_note( "Successfully pushed order to Zoho. " . $salesOrderOutput->salesorder->salesorder_number . " (" . $salesOrderOutput->salesorder->customer_name . ")" );
-
-			//TODO: Create error notes in Order (including setting?)
-			//TODO: Create setting for updating order status to specific default (completed)
-
-			//Add Payment Method As Notes;
-			$paymentMethod = "Payment Method: " . $order->get_payment_method_title() . " (" . $order->get_payment_method() . ")";
-			$this->zohoAPI->createComment( $salesOrderOutput->salesorder->salesorder_id, $paymentMethod );
-
-			$this->zohoAPI->createComment( $salesOrderOutput->salesorder->salesorder_id, $orderComment ); //Adding missing / inactive products.
-
-
-			$this->writeDebug( "Push Order", "Successfully pushed $order_id to Zoho." );
-
-			return true;
-
-		} catch ( Exception $e ) {
-			if ( ! $isQueued ) {
-				$this->ordersQueue->updateOrder( $order_id, "error", $e->getMessage(), true );
-			}
-			$this->writeDebug( "Push Order", "ERROR Exception:" . $e->getMessage() );
-
-			return false;
-		}
-	}
-
-	public function writeDebug( $type, $data ) {
-		if ( WC_Admin_Settings::get_option( "wc_zoho_connector_debugging" ) ) {
-			$multisiteString = is_multisite() ? "[" . get_bloginfo( 'name' ) . "]" : ( "" ); //Multi-site support.
-			$logfile         = realpath( __DIR__ . '/..' ) . '/debug_log';
-			file_put_contents( $logfile,
-				$multisiteString . "[" . date( "Y-m-d H:i:s" ) . "] [" . $type . "] " . $data . "\n", FILE_APPEND );
-		}
+		return $convertedItem;
 	}
 
 	public function scheduleOrder( $post_id, $timestamp = false ) {

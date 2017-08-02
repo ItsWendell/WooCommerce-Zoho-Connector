@@ -22,6 +22,12 @@
  */
 class Woozoho_Connector_Activator {
 
+	public static function check_version() {
+		if ( ! defined( 'IFRAME_REQUEST' ) && get_option( 'woozoho_connector_version' ) !== Woozoho_Connector()->version ) {
+			self::install();
+		}
+	}
+
 	/**
 	 * Short Description. (use period)
 	 *
@@ -35,14 +41,11 @@ class Woozoho_Connector_Activator {
 		//TODO: Implement version management for database
 		//TODO: Implement database update scripts (e.x. WooCommerce)
 
-		$client     = new Woozoho_Connector_Zoho_Client();
 		$table_name = $wpdb->prefix . 'woozoho_orders_tracker';
-		$client->writeDebug( "Install DB", "Activating plugin in " . $table_name );
+		Woozoho_Connector_Logger::writeDebug( "Install DB", "Activating plugin in " . $table_name );
 
 		if ( $wpdb->get_var( "SHOW TABLES LIKE '$table_name'" ) != $table_name ) {
-			$client->writeDebug( "Install DB", "Table doesn't exist, creating table " . $table_name );
-			global $wpdb;
-			$charset_collate = $wpdb->get_charset_collate();
+			Woozoho_Connector_Logger::writeDebug( "Install DB", "Table doesn't exist, creating table " . $table_name );
 
 			$sql = "CREATE TABLE $table_name (
   			ID bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -58,16 +61,10 @@ class Woozoho_Connector_Activator {
 
 			require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
 			$resultData = dbDelta( $sql );
-			$client->writeDebug( "Install DB", $resultData );
+			Woozoho_Connector_Logger::writeDebug( "Install DB", $resultData );
 
 		} else {
-			$client->writeDebug( "Install DB", "Table already installed. Moving on." );
-		}
-	}
-
-	public static function check_version() {
-		if ( ! defined( 'IFRAME_REQUEST' ) && get_option( 'woozoho_connector_version' ) !== Woozoho_Connector()->version ) {
-			self::install();
+			Woozoho_Connector_Logger::writeDebug( "Install DB", "Table already installed. Moving on." );
 		}
 	}
 }

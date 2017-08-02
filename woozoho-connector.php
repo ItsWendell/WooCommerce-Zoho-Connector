@@ -13,7 +13,7 @@
  * Text Domain: woozoho-connector
  * Domain Path: /i18n/languages/
  *
- * @package WooZoho
+ * @package woozoho-connector
  * @category Core
  * @author DigiSpark
  *
@@ -27,42 +27,38 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class Woozoho_Connector {
 
+	protected static $_instance = null;
 	public $version = "0.3";
+	/**
+	 * @var Woozoho_Connector_Zoho_Client
+	 */
 	public $client;
+	public $logger;
 	/**
 	 * @var Woozoho_Connector_Cronjobs
 	 */
 	public $cron_jobs;
-
 	/**
 	 * @var Woozoho_Connector_Loader
 	 */
 	protected $loader;
 
-	protected static $_instance = null;
+	public function __construct() {
+		require_once dirname( __FILE__ ) . '/includes/class-woozoho-connector-logger.php';
+		if ( ! $this->check_dependencies() ) {
+			Woozoho_Connector_Logger::writeDebug( "Plugin", "Dependencies not met!" );
+			wp_die( "WooZoho connector needs WooCommerce installed." );
 
-	public static function instance() {
-		if ( is_null( self::$_instance ) ) {
-			self::$_instance = new self();
+			return;
 		}
 
-		return self::$_instance;
-	}
-
-	public function __construct() {
 		$this->define_constants();
 		$this->load_dependencies();
-
-		$this->int_hooks();
-		$this->int_cron_jobs();
+		$this->init();
 	}
 
-	public function init() {
-		$this->load_plugin_textdomain();
-
-		$this->client    = new Woozoho_Connector_Zoho_Client();
-		$this->cron_jobs = new Woozoho_Connector_Cronjobs();
-		$this->loader    = new Woozoho_Connector_Loader();
+	public function check_dependencies() {
+		return in_array( 'woocommerce/woocommerce.php', (array) get_option( 'active_plugins', array() ) );
 	}
 
 	private function define_constants() {
@@ -80,13 +76,17 @@ final class Woozoho_Connector {
 		}
 	}
 
+	/**
+	 * @noinspection PhpIncludeInspection,PhpUndefinedConstantInspection
+	 */
 	private function load_dependencies() {
 
 		/**
 		 * The class responsible for orchestrating the actions and filters of the
 		 * core plugin.
 		 */
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-woozoho-connector-loader.php';
+		/** @noinspection PhpIncludeInspection */
+		require_once WOOZOHO_ABSPATH . 'includes/class-woozoho-connector-loader.php';
 
 		/**
 		 * The class responsible for defining internationalization functionality
@@ -94,29 +94,40 @@ final class Woozoho_Connector {
 		 */
 
 		//ZohoConnector Core Functionality
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-woozoho-connector-zoho-cache.php';
 
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-woozoho-connector-zoho-api.php';
-
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-woozoho-connector-orders-queue.php';
-
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-woozoho-connector-zoho-client.php';
-
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-woozoho-connector-cronjobs.php';
+		require_once WOOZOHO_ABSPATH . 'includes/class-woozoho-connector-zoho-cache.php';
+		require_once WOOZOHO_ABSPATH . 'includes/class-woozoho-connector-zoho-api.php';
+		require_once WOOZOHO_ABSPATH . 'includes/class-woozoho-connector-orders-queue.php';
+		require_once WOOZOHO_ABSPATH . 'includes/class-woozoho-connector-zoho-client.php';
+		require_once WOOZOHO_ABSPATH . 'includes/class-woozoho-connector-cronjobs.php';
 
 		/**
 		 * The class responsible for defining all actions that occur in the admin area.
 		 */
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/class-woozoho-connector-admin.php';
+		require_once WOOZOHO_ABSPATH . 'admin/class-woozoho-connector-admin.php';
 
 	}
 
-	public function load_plugin_textdomain() {
-		load_plugin_textdomain(
-			'woozoho-connector',
-			false,
-			dirname( dirname( plugin_basename( __FILE__ ) ) ) . '/languages/'
-		);
+	public static function instance() {
+		if ( is_null( self::$_instance ) ) {
+			self::$_instance = new self();
+		}
+
+		return self::$_instance;
+	}
+
+	public function init() {
+		$this->load_plugin_textdomain();
+
+		$this->loader    = new Woozoho_Connector_Loader();
+		$this->logger    = new Woozoho_Connector_Logger();
+		$this->client    = new Woozoho_Connector_Zoho_Client();
+		$this->cron_jobs = new Woozoho_Connector_Cronjobs();
+
+		$this->plugin_hooks();
+		$this->int_cron_jobs();
+
+		$this->run();
 	}
 
 	/**
@@ -126,13 +137,14 @@ final class Woozoho_Connector {
 	 * @since    1.0.0
 	 * @access   private
 	 */
-	private function int_hooks() {
+	private function plugin_hooks() {
 
 		register_activation_hook( __FILE__, array( 'Woozoho_Connector_Activator', 'activate' ) );
 		register_deactivation_hook( __FILE__, array( 'Woozoho_Connector_Activator', 'deactivate' ) );
 
 		$plugin_admin = new Woozoho_Connector_Admin();
 
+		//Initialize only after WooCommerce has loaded?
 		$this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_styles' );
 		$this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_scripts' );
 
@@ -141,7 +153,7 @@ final class Woozoho_Connector {
 		$this->loader->add_action( 'woocommerce_settings_tabs_zoho_connector', $plugin_admin, 'woocommerce_settings_tab' );
 		$this->loader->add_action( 'woocommerce_update_options_zoho_connector', $plugin_admin, 'woocommerce_update_settings' );
 
-		$plugin_basename = plugin_basename( plugin_dir_path( __DIR__ ) . $this->plugin_name . '.php' );
+		$plugin_basename = plugin_basename( plugin_dir_path( __DIR__ ) . 'woozoho-connector.php' );
 		$this->loader->add_filter( 'plugin_action_links_' . $plugin_basename, $plugin_admin, 'add_action_links' );
 
 		//WooCommerce Bulk Functionality
@@ -166,8 +178,15 @@ final class Woozoho_Connector {
 		} else if ( ! $isEnabled && $this->cron_jobs->isOrdersJobRunning() ) {
 			$this->cron_jobs->stopOrdersJob();
 		}
-
 		$this->loader->add_action( 'woozoho_caching', $this->cron_jobs, 'startCaching' );
+	}
+
+	public function load_plugin_textdomain() {
+		load_plugin_textdomain(
+			'woozoho-connector',
+			false,
+			dirname( dirname( plugin_basename( __FILE__ ) ) ) . '/languages/'
+		);
 	}
 
 	/**

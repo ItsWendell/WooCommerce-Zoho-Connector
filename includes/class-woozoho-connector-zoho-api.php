@@ -1,22 +1,15 @@
 <?php
 
 class Woozoho_Connector_Zoho_API {
-	public $organizationId;
-	public $accessToken;
-
-	public $returnAsJson = true; // planned to determine function return format (Json/Boolean)
-
 	const ERROR_TYPE_CURL = 'cUrl';
 	const ERROR_TYPE_ZOHO = 'zoho';
-
-	const SCOPE_PURCHASEORDERS = 'purchaseorders';
+	const SCOPE_PURCHASEORDERS = 'purchaseorders'; // planned to determine function return format (Json/Boolean)
 	const SCOPE_SALESORDERS = 'salesorders';
 	const SCOPE_ITEMGROUP = 'itemgroup';
 	const SCOPE_INVOICES = 'invoices';
 	const SCOPE_CONTACTS = 'contacts';
 	const SCOPE_ITEMS = 'items';
 	const SCOPE_BILLS = 'bills';
-
 	const STATUS_ALL = 'Status.All';
 	const STATUS_ACTIVE_CUSTOMERS = 'Status.ActiveCustomers';
 	const STATUS_ACTIVE_VENDORS = 'Status.ActiveVendors';
@@ -26,6 +19,9 @@ class Woozoho_Connector_Zoho_API {
 	const STATUS_INACTIVE = 'Status.Inactive';
 	const STATUS_ACTIVE = 'Status.Active';
 
+	public $organizationId;
+	public $accessToken;
+	public $returnAsJson = true;
 	private $_baseUrl = 'books.zoho.com/api/v3';
 	private $_curlObject;
 
@@ -36,7 +32,7 @@ class Woozoho_Connector_Zoho_API {
 	 *
 	 * @throws \Exception
 	 */
-	public function __construct( array $config = [] ) {
+	public function __construct( array $config = array() ) {
 		if ( ! isset( $config['accessToken'] ) ) {
 			throw new \Exception( 'You have to set \'accessToken\' to use zoho client' );
 		}
@@ -53,6 +49,70 @@ class Woozoho_Connector_Zoho_API {
 		return $this->curlRequest( '/organizations' );
 	}
 
+	private function curlRequest( $alias, $method = 'GET', array $params = [], array $urlParams = [] ) {
+		$this->_curlObject = $this->initializeCurlObject();
+		if ( $method == 'POST' ) {
+			curl_setopt( $this->_curlObject, CURLOPT_POST, true );
+		} else {
+			curl_setopt( $this->_curlObject, CURLOPT_CUSTOMREQUEST, $method );
+		}
+		if ( $method == 'GET' ) {
+			curl_setopt( $this->_curlObject, CURLOPT_URL, $this->getUrlPath( $alias, $params ) );
+		} else {
+			curl_setopt( $this->_curlObject, CURLOPT_URL, $this->getUrlPath( $alias, $urlParams ) );
+			curl_setopt( $this->_curlObject, CURLOPT_POSTFIELDS, $params );
+		}
+
+
+		//MORE CRAP
+		curl_setopt( $this->_curlObject, CURLOPT_AUTOREFERER, true );
+		curl_setopt( $this->_curlObject, CURLOPT_SSL_VERIFYPEER, false );
+		curl_setopt( $this->_curlObject, CURLOPT_SSL_VERIFYHOST, false );
+		curl_setopt( $this->_curlObject, CURLOPT_VERBOSE, 1 );
+		$fp = fopen( dirname( __FILE__ ) . '/errorlog.txt', 'w' );
+		curl_setopt( $this->_curlObject, CURLOPT_STDERR, $fp );
+
+		return $this->execute();
+	}
+
+	//************************************** Item *********************************************
+
+	private function initializeCurlObject() {
+		$this->_curlObject = curl_init( '' );
+		curl_setopt( $this->_curlObject, CURLOPT_RETURNTRANSFER, 1 );
+
+		return $this->_curlObject;
+	}
+
+	private function getUrlPath( $alias, $params = [] ) {
+		return 'https://' . preg_replace( '/\/+/', '/', "{$this->_baseUrl}/{$alias}" ) . '?'
+		       . http_build_query( array_merge( $this->getAuthParams(), $params ?: [] ) );
+	}
+
+	/**
+	 * Retrieves the array of authentication configs
+	 * @return array
+	 */
+	public function getAuthParams() {
+		return array_merge( [ 'authtoken' => $this->accessToken, 'organization_id' => $this->organizationId ] );
+	}
+
+	private function execute() {
+		$return = curl_exec( $this->_curlObject );
+		if ( curl_errno( $this->_curlObject ) ) {
+			$errorNo   = curl_errno( $this->_curlObject );
+			$errorText = curl_error( $this->_curlObject );
+			throw new \Exception( "cUrl Error ({$errorNo}) : {$errorText}." );
+		}
+		curl_close( $this->_curlObject );
+		$return = json_decode( $return );
+		if ( $return->code == 0 ) {
+			return $return;
+		} else {
+			throw new \Exception( "Zoho Error ({$return->code}) : {$return->message}." );
+		}
+	}
+
 	/**
 	 * an extra function to update system settings
 	 *
@@ -62,10 +122,8 @@ class Woozoho_Connector_Zoho_API {
 	 * @return \stdClass
 	 */
 	public function updateSettings( $scope, $params ) {
-		return $this->curlRequest( "/settings/$scope/", 'PUT', [ 'JSONString' => json_encode( $params ) ] );
+		return $this->curlRequest( "/settings/$scope/", 'PUT', array( 'JSONString' => json_encode( $params ) ) );
 	}
-
-	//************************************** Item *********************************************
 
 	/**
 	 * @param array $params array of properties for the new item
@@ -74,7 +132,7 @@ class Woozoho_Connector_Zoho_API {
 	 * @see https://www.zoho.com/inventory/api/v1/#create-a-item
 	 */
 	public function createItem( $params ) {
-		return $this->curlRequest( '/items', 'POST', [ 'JSONString' => json_encode( $params ) ] );
+		return $this->curlRequest( '/items', 'POST', array( 'JSONString' => json_encode( $params ) ) );
 	}
 
 	/**
@@ -99,18 +157,6 @@ class Woozoho_Connector_Zoho_API {
 	}
 
 	/**
-	 * List all items
-	 *
-	 * @param array $filters an extra option allows you to filter items by specific fields, leave empty to list all items
-	 *
-	 * @return \stdClass
-	 * @see https://www.zoho.com/inventory/api/v1/#list-all-item
-	 */
-	public function listItems( array $filters = [] ) {
-		return $this->curlRequest( "/items/", 'GET', $filters );
-	}
-
-	/**
 	 * an extra function allows you to search items by text portion
 	 *
 	 * @param string $search_text
@@ -119,6 +165,20 @@ class Woozoho_Connector_Zoho_API {
 	 */
 	public function searchItem( $search_text ) {
 		return $this->listItems( [ 'search_text' => $search_text ] );
+	}
+
+	//************************************** Item Group *********************************************
+
+	/**
+	 * List all items
+	 *
+	 * @param array $filters an extra option allows you to filter items by specific fields, leave empty to list all items
+	 *
+	 * @return \stdClass
+	 * @see https://www.zoho.com/inventory/api/v1/#list-all-item
+	 */
+	public function listItems( array $filters = array() ) {
+		return $this->curlRequest( "/items/", 'GET', $filters );
 	}
 
 	/**
@@ -169,8 +229,6 @@ class Woozoho_Connector_Zoho_API {
 		return $this->curlRequest( "/items/{$item_id}/inactive", 'POST' );
 	}
 
-	//************************************** Item Group *********************************************
-
 	/**
 	 * Create a item group
 	 *
@@ -196,6 +254,17 @@ class Woozoho_Connector_Zoho_API {
 		return $this->curlRequest( "/itemgroups/{$itemgroup_id}", 'PUT', [ 'JSONString' => json_encode( $params ) ] );
 	}
 
+	//************************************** Purchase Order *********************************************
+
+	/**
+	 * List all Item Group
+	 * @return \stdClass
+	 * @see https://www.zoho.com/inventory/api/v1/#list-all-item-group
+	 */
+	public function listItemGroups() {
+		return $this->retrieveItemGroup();
+	}
+
 	/**
 	 * Retrieve a Item Group
 	 *
@@ -206,15 +275,6 @@ class Woozoho_Connector_Zoho_API {
 	 */
 	public function retrieveItemGroup( $group_id = null ) {
 		return $this->curlRequest( "/itemgroups/{$group_id}" );
-	}
-
-	/**
-	 * List all Item Group
-	 * @return \stdClass
-	 * @see https://www.zoho.com/inventory/api/v1/#list-all-item-group
-	 */
-	public function listItemGroups() {
-		return $this->retrieveItemGroup();
 	}
 
 	/**
@@ -253,8 +313,6 @@ class Woozoho_Connector_Zoho_API {
 		return $this->curlRequest( "/itemgroups/{$group_id}/inactive", 'POST' );
 	}
 
-	//************************************** Purchase Order *********************************************
-
 	/**
 	 * Create a purchase order
 	 *
@@ -288,6 +346,17 @@ class Woozoho_Connector_Zoho_API {
 		);
 	}
 
+	//************************************** Sales Order *********************************************
+
+	/**
+	 * List all purchase order
+	 * @return \stdClass
+	 * @see https://www.zoho.com/inventory/api/v1/#retrieve-a-purchase-order
+	 */
+	public function listPurchaseOrders() {
+		return $this->retrievePurchaseOrder();
+	}
+
 	/**
 	 * Retrieve a purchase order
 	 *
@@ -301,15 +370,6 @@ class Woozoho_Connector_Zoho_API {
 	}
 
 	/**
-	 * List all purchase order
-	 * @return \stdClass
-	 * @see https://www.zoho.com/inventory/api/v1/#retrieve-a-purchase-order
-	 */
-	public function listPurchaseOrders() {
-		return $this->retrievePurchaseOrder();
-	}
-
-	/**
 	 * Delete an purchase order
 	 *
 	 * @param string $purchaseorder_id to be deleted
@@ -320,7 +380,6 @@ class Woozoho_Connector_Zoho_API {
 	public function deletePurchaseOrder( $purchaseorder_id ) {
 		return $this->curlRequest( "/purchaseorders/{$purchaseorder_id}", 'DELETE' );
 	}
-
 
 	/**
 	 * Mark as issued
@@ -346,8 +405,6 @@ class Woozoho_Connector_Zoho_API {
 		return $this->curlRequest( "/purchaseorders/{$purchaseorder_id}/status/cancelled", 'POST' );
 	}
 
-	//************************************** Sales Order *********************************************
-
 	/**
 	 * Create a sales order
 	 *
@@ -363,6 +420,8 @@ class Woozoho_Connector_Zoho_API {
 			[ 'ignore_auto_number_generation' => $ignore ? 'true' : 'false' ]
 		);
 	}
+
+	//************************************** Contacts *********************************************
 
 	/**
 	 * Update details of an existing sales order
@@ -426,8 +485,6 @@ class Woozoho_Connector_Zoho_API {
 		return $this->curlRequest( "/salesorders/{$salesorder_id}/status/void", 'POST' );
 	}
 
-	//************************************** Contacts *********************************************
-
 	/**
 	 * @param array $params
 	 *
@@ -460,6 +517,9 @@ class Woozoho_Connector_Zoho_API {
 		return $this->curlRequest( "/contacts/{$contact_id}", 'GET', $filters );
 	}
 
+
+	//************************************** Others *********************************************
+
 	/**
 	 * @param array $filters filters array, use constants STATUS_.. to filter by contact type
 	 *
@@ -469,6 +529,8 @@ class Woozoho_Connector_Zoho_API {
 	public function listContacts( array $filters = [] ) {
 		return $this->curlRequest( "/contacts", 'GET', $filters );
 	}
+
+	//------------------------------ Execution Functions --------------------------
 
 	/**
 	 * @param string $contact_id contact id to delete
@@ -510,72 +572,5 @@ class Woozoho_Connector_Zoho_API {
 		$params = array( "description" => $description );
 
 		return $this->curlRequest( "/salesorders/{$salesorder_id}/comments", 'POST', [ 'JSONString' => json_encode( $params ) ] );
-	}
-
-
-	//************************************** Others *********************************************
-
-	/**
-	 * Retrieves the array of authentication configs
-	 * @return array
-	 */
-	public function getAuthParams() {
-		return array_merge( [ 'authtoken' => $this->accessToken, 'organization_id' => $this->organizationId ] );
-	}
-
-	//------------------------------ Execution Functions --------------------------
-
-	private function getUrlPath( $alias, $params = [] ) {
-		return 'https://' . preg_replace( '/\/+/', '/', "{$this->_baseUrl}/{$alias}" ) . '?'
-		       . http_build_query( array_merge( $this->getAuthParams(), $params ?: [] ) );
-	}
-
-	private function curlRequest( $alias, $method = 'GET', array $params = [], array $urlParams = [] ) {
-		$this->_curlObject = $this->initializeCurlObject();
-		if ( $method == 'POST' ) {
-			curl_setopt( $this->_curlObject, CURLOPT_POST, true );
-		} else {
-			curl_setopt( $this->_curlObject, CURLOPT_CUSTOMREQUEST, $method );
-		}
-		if ( $method == 'GET' ) {
-			curl_setopt( $this->_curlObject, CURLOPT_URL, $this->getUrlPath( $alias, $params ) );
-		} else {
-			curl_setopt( $this->_curlObject, CURLOPT_URL, $this->getUrlPath( $alias, $urlParams ) );
-			curl_setopt( $this->_curlObject, CURLOPT_POSTFIELDS, $params );
-		}
-
-
-		//MORE CRAP
-		curl_setopt( $this->_curlObject, CURLOPT_AUTOREFERER, true );
-		curl_setopt( $this->_curlObject, CURLOPT_SSL_VERIFYPEER, false );
-		curl_setopt( $this->_curlObject, CURLOPT_SSL_VERIFYHOST, false );
-		curl_setopt( $this->_curlObject, CURLOPT_VERBOSE, 1 );
-		$fp = fopen( dirname( __FILE__ ) . '/errorlog.txt', 'w' );
-		curl_setopt( $this->_curlObject, CURLOPT_STDERR, $fp );
-
-		return $this->execute();
-	}
-
-	private function initializeCurlObject() {
-		$this->_curlObject = curl_init( '' );
-		curl_setopt( $this->_curlObject, CURLOPT_RETURNTRANSFER, 1 );
-
-		return $this->_curlObject;
-	}
-
-	private function execute() {
-		$return = curl_exec( $this->_curlObject );
-		if ( curl_errno( $this->_curlObject ) ) {
-			$errorNo   = curl_errno( $this->_curlObject );
-			$errorText = curl_error( $this->_curlObject );
-			throw new \Exception( "cUrl Error ({$errorNo}) : {$errorText}." );
-		}
-		curl_close( $this->_curlObject );
-		$return = json_decode( $return );
-		if ( $return->code == 0 ) {
-			return $return;
-		} else {
-			throw new \Exception( "Zoho Error ({$return->code}) : {$return->message}." );
-		}
 	}
 }

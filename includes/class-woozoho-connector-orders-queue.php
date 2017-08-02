@@ -6,16 +6,15 @@ class Woozoho_Connector_Orders_Queue {
 	protected $dataTable;
 	protected $client;
 
-	public function __construct( $client ) {
+	public function __construct() {
 		$this->maxTries  = WC_Admin_Settings::get_option( "wc_zoho_connector_orders_queue_max_tries" );
 		$this->dataTable = "woozoho_orders_tracker";
-		$this->client    = $client;
 	}
 
 	public function getQueue() {
 		global $wpdb;
 
-		$this->client->writeDebug( "Orders Queue", "Listing all orders in queue in array." );
+		Woozoho_Connector_Logger::writeDebug( "Orders Queue", "Listing all orders in queue in array." );
 
 		$results = array();
 		//First getting error orders with maxtries.
@@ -33,7 +32,7 @@ class Woozoho_Connector_Orders_Queue {
 			array_push( $results, $orderQueueItem->post_id );
 		}
 
-		$this->client->writeDebug( "Orders Queue", count( $results ) . " active orders in queue listed" );
+		Woozoho_Connector_Logger::writeDebug( "Orders Queue", count( $results ) . " active orders in queue listed" );
 
 		return $results;
 	}
@@ -41,7 +40,7 @@ class Woozoho_Connector_Orders_Queue {
 	function addOrder( $order_id ) {
 		global $wpdb;
 
-		$this->client->writeDebug( "Orders Queue", "Inserting order '" . $order_id . "' into queue." );
+		Woozoho_Connector_Logger::writeDebug( "Orders Queue", "Inserting order '" . $order_id . "' into queue." );
 
 		if ( ! $wpdb->get_var(
 			$wpdb->prepare(
@@ -66,12 +65,12 @@ class Woozoho_Connector_Orders_Queue {
 					'%d',
 					'%s'
 				) ) ) {
-				Woozoho_Connector_Zoho_Client::writeDebug( "Orders Queue", "Sucessfully inserted '" . $order_id . "' into queue." );
+				Woozoho_Connector_Logger::writeDebug( "Orders Queue", "Sucessfully inserted '" . $order_id . "' into queue." );
 			} else {
-				Woozoho_Connector_Zoho_Client::writeDebug( "Orders Queue", "ERROR: Something went wrong with queuing '" . $order_id . "' into queue." );
+				Woozoho_Connector_Logger::writeDebug( "Orders Queue", "ERROR: Something went wrong with queuing '" . $order_id . "' into queue." );
 			}
 		} else {
-			Woozoho_Connector_Zoho_Client::writeDebug( "Orders Queue", "Order '" . $order_id . "' already exists in queue, skipping..." );
+			Woozoho_Connector_Logger::writeDebug( "Orders Queue", "Order '" . $order_id . "' already exists in queue, skipping..." );
 		}
 	}
 
@@ -98,12 +97,12 @@ class Woozoho_Connector_Orders_Queue {
 					array( '%d' )
 				) !== false
 			) {
-				$this->client->writeDebug( "Orders Queue", "Successfully updated order queue of order_id:" . $order_id );
+				Woozoho_Connector_Logger::writeDebug( "Orders Queue", "Successfully updated order queue of order_id:" . $order_id );
 			} else {
-				$this->client->writeDebug( "Orders Queue", "ERROR: Error updating orders queue for " . $order_id . "." );
+				Woozoho_Connector_Logger::writeDebug( "Orders Queue", "ERROR: Error updating orders queue for " . $order_id . "." );
 			}
 		} else {
-			$this->client->writeDebug( "Orders Queue", "ERROR: No orders in queue found for order id: " . $order_id . "." );
+			Woozoho_Connector_Logger::writeDebug( "Orders Queue", "ERROR: No orders in queue found for order id: " . $order_id . "." );
 		}
 	}
 }
