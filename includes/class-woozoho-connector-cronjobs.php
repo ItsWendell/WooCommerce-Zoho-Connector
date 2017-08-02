@@ -80,7 +80,7 @@ class Woozoho_Connector_Cronjobs {
 				Woozoho_Connector()->client->pushOrder( $order_id );
 			}
 		} else {
-			if ( Woozoho_Connector()->client->getCache()->isEnabled() ) {
+			if ( Woozoho_Connector()->client->getCache()->isEnabled() && ! defined( 'WOOZOHO_ITEMS_CACHING' ) ) {
 				Woozoho_Connector()->client->getCache()->checkItemsCache( true );
 			}
 		}

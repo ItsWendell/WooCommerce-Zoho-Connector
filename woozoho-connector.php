@@ -28,7 +28,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 final class Woozoho_Connector {
 
 	protected static $_instance = null;
-	public $version = "0.3";
+	public $version = "0.3.1";
 	/**
 	 * @var Woozoho_Connector_Zoho_Client
 	 */
@@ -58,7 +58,8 @@ final class Woozoho_Connector {
 	}
 
 	public function check_dependencies() {
-		return in_array( 'woocommerce/woocommerce.php', (array) get_option( 'active_plugins', array() ) );
+		return true;
+		//in_array( 'woocommerce/woocommerce.php', (array) get_option( 'active_plugins', array() ) );
 	}
 
 	private function define_constants() {

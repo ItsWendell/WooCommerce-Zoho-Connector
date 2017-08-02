@@ -79,6 +79,14 @@ class Woozoho_Connector_Zoho_Cache {
 	}
 
 	public function cacheItems() {
+		if ( defined( 'WOOZOHO_ITEMS_CACHING' ) ) {
+			Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Already an item caching instance running, skipping..." );
+
+			return false;
+		}
+
+		define( 'WOOZOHO_ITEMS_CACHING', true );
+
 		Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Listing all cached items..." );
 		$cacheFile = WOOZOHO_CACHE_DIR . "items.json";
 
@@ -104,6 +112,7 @@ class Woozoho_Connector_Zoho_Cache {
 
 			return false;
 		}
+
 	}
 
 	public function getItem( $sku ) {
