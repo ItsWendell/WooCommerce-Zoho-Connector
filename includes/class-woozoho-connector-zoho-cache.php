@@ -118,21 +118,17 @@ class Woozoho_Connector_Zoho_Cache {
 	public function getItem( $sku ) {
 		$items      = $this->getCachedItems();
 		$dataColumn = array_column( $items, 'sku' );
-		$key        = array_search( $sku, $dataColumn );
+		$key        = array_search( $sku, $dataColumn, true );
 		if ( $key !== false ) {
 			Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Item '$sku' found at position " . $key );
-
 			return $items[ $key ];
 		} else {
 			Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Item '$sku' not found in cache." );
-
 			return false;
 		}
 	}
 
 	public function getCachedItems() {
-		$folderTests = plugin_dir_path( __DIR__ );
-		Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Folder Test: " . $folderTests );
 		$cacheData = file_get_contents( WOOZOHO_CACHE_DIR . "items.json" );
 		if ( $cacheData ) {
 			$returnData = json_decode( $cacheData );
