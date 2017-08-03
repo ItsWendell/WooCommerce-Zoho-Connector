@@ -66,7 +66,6 @@ class Woozoho_Connector_Admin {
 
 	public static function get_settings() {
 		//TODO: Move setings to own file.
-		//TODO: Add setting for pricing preference, (Zoho Or WooCommerce)
 		//TODO: Add update feature to update on-the-fly pricing on Zoho or WooCommerce.
 		//TODO: Change WP to bestelling. (Add option for reference pre-fix)
 
@@ -202,6 +201,35 @@ class Woozoho_Connector_Admin {
 				'default' => '1 day',
 				'desc'    => __( 'How long is caching valid?', 'woozoho-connector' ),
 				'id'      => 'wc_zoho_connector_api_cache_items'
+			),
+
+			array(
+				'name'    => __( 'Reference Number Format', 'woozoho-connector' ),
+				'type'    => 'text',
+				'default' => ( is_multisite() == true ) ? 'WP-%post_id%-%blog_id%' : 'WP-%post_id%',
+				'desc'    => __( '%post_id% = WooCommerce Order ID & %blog_id% = multisite blog id', 'woozoho-connector' ),
+				'id'      => 'wc_zoho_connector_reference_number_format'
+			),
+
+			array(
+				'name'    => __( 'WooCommerce Order Status After Pushing', 'woozoho-connector' ),
+				'type'    => 'select',
+				'options' => array(
+					'wc-processing' => __( 'Processing', 'woozoho-connector' ),
+					'wc-on-hold'    => __( 'On Hold', 'woozoho-connector' ),
+					'wc-completed'  => __( 'Completed', 'woozoho-connector' ),
+				),
+				'default' => 'wc-processing',
+				'desc'    => __( 'Change order status after pushing to zoho.', 'woozoho-connector' ),
+				'id'      => 'wc_zoho_connector_pushed_order_status'
+			),
+
+			array(
+				'name'    => __( 'Singular Caching', 'woozoho-connector' ),
+				'type'    => 'checkbox',
+				'default' => 'no',
+				'desc'    => __( 'Merged caching for multi-stores.', 'woozoho-connector' ),
+				'id'      => 'wc_zoho_connector_multisite_single_cache'
 			),
 
 			array(

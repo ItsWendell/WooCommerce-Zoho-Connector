@@ -19,7 +19,7 @@ class Woozoho_Connector_Zoho_Cache {
 	/**
 	 * @var Woozoho_Connector_Zoho_Client
 	 */
-	protected $cacheLocation;
+	protected $cacheDir;
 	protected $apiCachingItemsTimeout;
 
 	/**
@@ -29,7 +29,11 @@ class Woozoho_Connector_Zoho_Cache {
 	public function __construct() {
 		//Load settings
 		$this->apiCachingItemsTimeout = WC_Admin_Settings::get_option( "wc_zoho_connector_api_cache_items" );
-		$this->cacheLocation          = WOOZOHO_CACHE_DIR;
+		if ( WC_Admin_Settings::get_option( "wc_zoho_connector_multisite_single_cache" ) == "yes" ) {
+			$this->cacheDir = WOOZOHO_ABSPATH . "cache/";
+		} else {
+			$this->cacheDir = WOOZOHO_CACHE_DIR;
+		}
 	}
 
 	public function isEnabled() {
@@ -43,7 +47,7 @@ class Woozoho_Connector_Zoho_Cache {
 	public function checkItemsCache( $make_valid = false ) {
 		Woozoho_Connector_Logger::writeDebug( "API Cache", "Checking if cache is valid." );
 		/** @noinspection PhpUndefinedConstantInspection */
-		$cacheFile = WOOZOHO_CACHE_DIR . "items.json";
+		$cacheFile = $this->cacheDir . "items.json";
 		if ( file_exists( $cacheFile ) ) {
 			$fileTime   = filectime( $cacheFile );
 			$nowTime    = time();
@@ -88,10 +92,10 @@ class Woozoho_Connector_Zoho_Cache {
 		define( 'WOOZOHO_ITEMS_CACHING', true );
 
 		Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Listing all cached items..." );
-		$cacheFile = WOOZOHO_CACHE_DIR . "items.json";
+		$cacheFile = $this->cacheDir . "items.json";
 
-		if ( ! is_dir( WOOZOHO_CACHE_DIR ) ) {
-			mkdir( WOOZOHO_CACHE_DIR );
+		if ( ! is_dir( $this->cacheDir ) ) {
+			mkdir( $this->cacheDir );
 		}
 
 		//Get all items
@@ -100,19 +104,15 @@ class Woozoho_Connector_Zoho_Cache {
 		if ( ! empty( $itemsCache ) ) {
 			if ( file_put_contents( $cacheFile, json_encode( $itemsCache ) ) ) {
 				Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Successfully wrote items to cache." );
-
 				return true;
 			} else {
 				Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Error something went wrong with writing to items cache, check file permissions!" );
-
 				return false;
 			}
 		} else {
 			unlink( $cacheFile );
-
 			return false;
 		}
-
 	}
 
 	public function getItem( $sku ) {
