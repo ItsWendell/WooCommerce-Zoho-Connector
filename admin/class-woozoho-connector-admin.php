@@ -52,15 +52,15 @@ class Woozoho_Connector_Admin {
 	}
 
 	public static function woocommerce_update_settings() {
-		$oldOrderRecurrence = WC_Admin_Settings::get_option( "wc_zoho_connector_cron_orders_recurrence" );
+		$oldOrderRecurrence = Woozoho_Connector::get_option( "cron_orders_recurrence" );
 		Woozoho_Connector_Logger::writeDebug( "Settings", "Settings updated!" );
-		$data = WC_Admin_Settings::get_option( "wc_zoho_connector_notify_email_option" );
+		$data = Woozoho_Connector::get_option( "notify_email_option" );
 		Woozoho_Connector_Logger::writeDebug( "Settings",
 			"Settings data: " .
 			print_r( $data->zoho_sku, true ) );
 		woocommerce_update_options( self::get_settings() );
-		if ( $oldOrderRecurrence != WC_Admin_Settings::get_option( "wc_zoho_connector_cron_orders_recurrence" ) ) {
-			Woozoho_Connector()->cron_jobs->updateOrdersJob( WC_Admin_Settings::get_option( "wc_zoho_connector_cron_orders_recurrence" ) );
+		if ( $oldOrderRecurrence != Woozoho_Connector::get_option( "cron_orders_recurrence" ) ) {
+			Woozoho_Connector()->cron_jobs->updateOrdersJob( Woozoho_Connector::get_option( "cron_orders_recurrence" ) );
 		}
 	}
 
@@ -398,7 +398,7 @@ class Woozoho_Connector_Admin {
 			Woozoho_Connector_Logger::writeDebug( "WooCommerce", "A new order ($order_id) received." );
 		}
 
-		if ( WC_Admin_Settings::get_option( "wc_zoho_connector_cron_orders_recurrence" ) == "directly" ) {
+		if ( Woozoho_Connector::get_option( "cron_orders_recurrence" ) == "directly" ) {
 			Woozoho_Connector()->client->scheduleOrder( $order_id );
 		} else {
 			Woozoho_Connector()->client->getOrdersQueue()->addOrder( $order_id );

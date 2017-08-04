@@ -170,7 +170,7 @@ final class Woozoho_Connector {
 	}
 
 	private function int_cron_jobs() {
-		$isEnabled = WC_Admin_Settings::get_option( "wc_zoho_connector_cron_orders_enabled" );
+		$isEnabled = Woozoho_Connector::get_option( "cron_orders_enabled" );
 		if ( $isEnabled ) {
 			if ( ! $this->cron_jobs->isOrdersJobRunning() ) {
 				$this->cron_jobs->setupOrdersJob();
@@ -217,6 +217,10 @@ final class Woozoho_Connector {
 	 */
 	public function get_version() {
 		return $this->version;
+	}
+
+	public static function get_option( $option_name ) {
+		return WC_Admin_Settings::get_option( 'wc_zoho_connector_' . $option_name );
 	}
 
 

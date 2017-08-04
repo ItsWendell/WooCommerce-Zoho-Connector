@@ -28,8 +28,8 @@ class Woozoho_Connector_Zoho_Cache {
 	 */
 	public function __construct() {
 		//Load settings
-		$this->apiCachingItemsTimeout = WC_Admin_Settings::get_option( "wc_zoho_connector_api_cache_items" );
-		if ( WC_Admin_Settings::get_option( "wc_zoho_connector_multisite_single_cache" ) == "yes" ) {
+		$this->apiCachingItemsTimeout = Woozoho_Connector::get_option( "api_cache_items" );
+		if ( Woozoho_Connector::get_option( "multisite_single_cache" ) == "yes" ) {
 			$this->cacheDir = WOOZOHO_ABSPATH . "cache/";
 		} else {
 			$this->cacheDir = WOOZOHO_CACHE_DIR;

@@ -30,7 +30,7 @@ class Woozoho_Connector_Cronjobs {
 	}
 
 	public function updateOrdersJob( $recurrence ) {
-		$isEnabled = WC_Admin_Settings::get_option( "wc_zoho_connector_cron_orders_enabled" );
+		$isEnabled = Woozoho_Connector::get_option( "cron_orders_enabled" );
 		if ( $isEnabled ) {
 			$oldRecurrence = wp_get_schedule( 'woozoho_orders_job' );
 			if ( $recurrence != $oldRecurrence ) {
@@ -53,7 +53,7 @@ class Woozoho_Connector_Cronjobs {
 	}
 
 	public function setupOrdersJob() {
-		$recurrence = WC_Admin_Settings::get_option( "wc_zoho_connector_cron_orders_recurrence" );
+		$recurrence = Woozoho_Connector::get_option( "cron_orders_recurrence" );
 		if ( $recurrence == "directly" ) {
 			$recurrence = "hourly";
 		}

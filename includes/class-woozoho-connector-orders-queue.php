@@ -7,7 +7,7 @@ class Woozoho_Connector_Orders_Queue {
 	protected $client;
 
 	public function __construct() {
-		$this->maxTries  = WC_Admin_Settings::get_option( "wc_zoho_connector_orders_queue_max_tries" );
+		$this->maxTries  = Woozoho_Connector::get_option( "orders_queue_max_tries" );
 		$this->dataTable = "woozoho_orders_tracker";
 	}
 

@@ -25,8 +25,8 @@ class Woozoho_Connector_Zoho_Client {
 	public function __construct() {
 		//API Settings
 		$args                   = array();
-		$args["accessToken"]    = WC_Admin_Settings::get_option( "wc_zoho_connector_token" );
-		$args["organizationId"] = WC_Admin_Settings::get_option( "wc_zoho_connector_organisation_id" );
+		$args["accessToken"]    = Woozoho_Connector::get_option( "token" );
+		$args["organizationId"] = Woozoho_Connector::get_option( "organisation_id" );
 
 		//Variables
 		$this->logLocation = realpath( __DIR__ . DIRECTORY_SEPARATOR . '..' );
@@ -82,10 +82,13 @@ class Woozoho_Connector_Zoho_Client {
 	}
 
 	public function sendNotificationEmail( $subject, $message ) {
-		//TODO: Add multisite support
-		$mailTo = WC_Admin_Settings::get_option( "wc_zoho_connector_notify_email" );
+		$mailTo = Woozoho_Connector::get_option( "notify_email" );
 		if ( $mailTo ) {
-			$headers[] = 'From: WordPress Zoho Connector <wordpress@mydoo.nl>';
+			if ( ! is_multisite() ) {
+				$headers[] = 'From: Zoho Connector <' . get_option( 'admin_email' ) . '>';
+			} else {
+				$headers[] = 'From: Zoho Connector ' . get_bloginfo( 'name' ) . '<' . get_option( 'admin_email' ) . '>';
+			}
 			$headers[] = 'Content-Type: text/html; charset=UTF-8';
 			wp_mail( $mailTo, "WooCommerce Zoho Connector:" . $subject, $message, $headers );
 			Woozoho_Connector_Logger::writeDebug( "Notification Email", "Email with subject '" . $subject . " sent to " . $mailTo );
@@ -100,7 +103,7 @@ class Woozoho_Connector_Zoho_Client {
 	}
 
 	public function getReferenceNumber( $order_id ) {
-		$rawString = WC_Admin_Settings::get_option( "wc_zoho_connector_reference_number_format" );
+		$rawString = Woozoho_Connector::get_option( "reference_number_format" );
 
 		$refVars = array(
 			'post_id' => $order_id,
@@ -157,6 +160,64 @@ class Woozoho_Connector_Zoho_Client {
 	}
 
 	/**
+	 * @var WC_Order_Item_Product $line_item
+	 * @var $zoho_item
+	 * @var string|bool $preference
+	 *
+	 * Returns updated line_item
+	 * @return bool|object
+	 */
+
+	public function update_pricing( $line_item, $zoho_item, $order_id, $preference = false ) {
+		if ( empty( $line_item ) || empty( $zoho_item ) ) {
+			Woozoho_Connector_Logger::writeDebug( "Price Updater", "Skipping updates, WooCommerce or Zoho Item is empty." );
+
+			return $zoho_item;
+		}
+
+		if ( $preference == false ) {
+			$preference = Woozoho_Connector::get_option( "pricing" );
+		}
+
+		$price_woocommerce = (float) $line_item->get_product()->get_price();
+		$price_zoho        = (float) $zoho_item->rate;
+
+		Woozoho_Connector_Logger::writeDebug( "Price Updater", "Pricing preference: $preference, WooCommerce: $price_woocommerce - Zoho: $price_zoho" );
+
+		if ( $price_zoho != $price_woocommerce ) {
+			if ( $preference == "zoho" ) {
+				update_post_meta( $line_item->get_product()->get_id(), '_price', $price_zoho );
+				update_post_meta( $line_item->get_product()->get_id(), '_regular_price', $price_zoho );
+
+				//TODO: Add proper support for updating order items itself, seems harder that it should be.
+
+				Woozoho_Connector_Logger::writeDebug( "Price Updater", "Updated WooCommerce pricing to Zoho." );
+
+				return $zoho_item;
+			} else if ( $preference == "woocommerce" ) {
+				$update = $this->updateZohoItem( $zoho_item->item_id, [ "rate" => $price_woocommerce ] );
+				if ( $update->code === 0 ) {
+					Woozoho_Connector_Logger::writeDebug( "Price Updater", "Updated Zoho pricing to WooCommerce." );
+
+					return $update->item;
+				} else {
+					Woozoho_Connector_Logger::writeDebug( "Price Updater", "Ooops something went wrong: " . $update->message );
+
+					return $zoho_item;
+				}
+			}
+		} else {
+			Woozoho_Connector_Logger::writeDebug( "Price Updater", "Prices are equal, no update needed." );
+
+			return $zoho_item;
+		}
+	}
+
+	public function updateZohoItem( $item_id, $changes ) {
+		return $this->zohoAPI->updateItem( $item_id, $changes );
+	}
+
+	/**
 	 * @param $order_id
 	 *
 	 * @return bool
@@ -202,7 +263,7 @@ class Woozoho_Connector_Zoho_Client {
 			$salesOrder["customer_id"]   = $contact->contact_id;
 			$salesOrder["customer_name"] = $contact->company_name;
 
-			if ( WC_Admin_Settings::get_option( "wc_zoho_connector_testmode" ) == "yes" ) {
+			if ( Woozoho_Connector::get_option( "testmode" ) == "yes" ) {
 				Woozoho_Connector_Logger::writeDebug( "Push Order", "TEST MODE IS ENABLED, USING TEST ORDER ID's." );
 				$salesOrder["salesorder_number"] = "TEST-" . $order_id;
 			} else {
@@ -234,13 +295,13 @@ class Woozoho_Connector_Zoho_Client {
 					$zohoItem = $this->getItem( $line_item->get_product()->get_sku(), $useCaching, false );
 					if ( ! $zohoItem ) { //Item not found in API or ZOHO.
 
-						if ( WC_Admin_Settings::get_option( "wc_zoho_connector_create_items" ) == 'yes' ) { //We can create new items...
+						if ( Woozoho_Connector::get_option( "create_items" ) == 'yes' ) { //We can create new items...
 
 							$zohoItem = $this->createZohoItem( $line_item );
 
 							if ( $zohoItem !== false ) {
-								$line_item = $this->itemConvert( $zohoItem, $line_item );
-								array_push( $salesOrder["line_items"], $line_item );
+								$zoho_line_item = $this->itemConvert( $zohoItem, $line_item );
+								array_push( $salesOrder["line_items"], $zoho_line_item );
 							} else {
 								$missingProducts .= $this->itemToNotes( $line_item );
 								Woozoho_Connector_Logger::writeDebug( "Push Order", "Can't create zoho item with SKU (" . $line_item->get_product()->get_sku() . "). Adding to notes." );
@@ -251,7 +312,9 @@ class Woozoho_Connector_Zoho_Client {
 							Woozoho_Connector_Logger::writeDebug( "Push Order", "Product (" . $line_item->get_product()->get_sku() . ") not found. Adding to notes." );
 						}
 					} else { //Item found in cache or live API
-						//TODO: Check for price preference and differences, also be careful of item . & , declerations.
+						if ( Woozoho_Connector::get_option( "pricing_updates" ) == "yes" ) {
+							$zohoItem = $this->update_pricing( $line_item, $zohoItem, $order_id );
+						}
 						if ( $zohoItem->status == "active" ) { //Zoho sales orders only accepts active items.
 							$zoho_line_item = $this->itemConvert( $zohoItem, $line_item );
 							array_push( $salesOrder["line_items"], $zoho_line_item );
@@ -265,12 +328,10 @@ class Woozoho_Connector_Zoho_Client {
 					$missingProducts .= $this->itemToNotes( $line_item );
 					Woozoho_Connector_Logger::writeDebug( "Push Order", "Error: Product (" . $line_item['name'] . ") not found in WooCommerce, so we can't find SKU. Product is added as a note." );
 				}
-
-
 			}
 
 			if ( empty( $salesOrder["line_items"] ) ) {
-				Throw new Exception( "No items found or connected to this order.");
+				Throw new Exception( "No items found or connected to this order." );
 			}
 
 			//Handle Notes
@@ -284,7 +345,7 @@ class Woozoho_Connector_Zoho_Client {
 
 			$orderComment = $missingProducts . $inactiveProducts . "Automatically generated by WooCommerce Zoho Connector.";
 
-			$salesOrderOutput = $this->zohoAPI->createSalesOrder( $salesOrder, ( WC_Admin_Settings::get_option( "wc_zoho_connector_testmode" ) == "yes" ) );
+			$salesOrderOutput = $this->zohoAPI->createSalesOrder( $salesOrder, ( Woozoho_Connector::get_option( "testmode" ) == "yes" ) );
 
 			if ( ! $salesOrderOutput->salesorder ) {
 				throw new Exception( "Unable to push sales order to Zoho, invalid return." );
@@ -296,7 +357,7 @@ class Woozoho_Connector_Zoho_Client {
 			//Push Order Notes
 			$order->add_order_note( "Successfully pushed order to Zoho. " . $salesOrderOutput->salesorder->salesorder_number . " (" . $salesOrderOutput->salesorder->customer_name . ")" );
 
-			$order_status_setting = WC_Admin_Settings::get_option( "wc_zoho_connector_pushed_order_status" );
+			$order_status_setting = Woozoho_Connector::get_option( "pushed_order_status" );
 			if ( $order_status_setting != $order->get_status() ) {
 				$order->set_status( $order_status_setting );
 			}
@@ -323,7 +384,7 @@ class Woozoho_Connector_Zoho_Client {
 				$order->add_order_note( "WooCommerce Zoho Connector Error: " . $e->getMessage() );
 			}
 
-			if ( WC_Admin_Settings::get_option( "wc_zoho_connector_email_notifications_failed_order" ) == "yes" ) {
+			if ( Woozoho_Connector::get_option( "email_notifications_failed_order" ) == "yes" ) {
 				$this->sendNotificationEmail( "Order $order_id failed to push to Zoho.",
 					$e->getMessage() .
 					"<br/>Go to order: " . get_edit_post_link( $order_id ) );
@@ -479,7 +540,7 @@ class Woozoho_Connector_Zoho_Client {
 	public function itemConvert( $zohoItem, $storeItem, $quantity = 0 ) {
 		$convertedItem = array(
 			"item_id"     => $zohoItem->item_id,
-			"rate"        => ( WC_Admin_Settings::get_option( "wc_zoho_connector_pricing" ) == "zoho" || ! $storeItem ) ?
+			"rate"        => ( Woozoho_Connector::get_option( "pricing" ) == "zoho" || ! $storeItem ) ?
 				$zohoItem->rate : $storeItem->get_total(),
 			"name"        => $zohoItem->name,
 			"description" => $zohoItem->description,
