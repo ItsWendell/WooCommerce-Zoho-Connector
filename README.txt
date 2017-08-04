@@ -1,8 +1,8 @@
 //TODO: UPDATE README.TXT WITH PROPER INFORMATION.
-=== Plugin Name ===
-Contributors: (this should be a list of wordpress.org userid's)
+=== Connector for WooCommerce & Zoho (Books) ===
+Contributors: DigiSpark
 Donate link: https://digispark.nl/
-Tags: comments, spam
+Tags: woocommerce, zoho, synchronisation, api, connector
 Requires at least: 3.0.1
 Tested up to: 4.8
 Stable tag: 4.3

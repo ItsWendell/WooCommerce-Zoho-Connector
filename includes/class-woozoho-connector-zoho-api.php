@@ -25,6 +25,9 @@ class Woozoho_Connector_Zoho_API {
 	private $_baseUrl = 'books.zoho.com/api/v3';
 	private $_curlObject;
 
+	//TODO: Add support of counting API calls on daily basis.
+	//TODO: Before doing API calls figure out how many calls are required (maximum) and see if that fits within the limits of today, if not move the job to tomorrow.
+
 	/**
 	 * ZohoClient constructor.
 	 *
@@ -111,6 +114,11 @@ class Woozoho_Connector_Zoho_API {
 		} else {
 			throw new \Exception( "Zoho Error ({$return->code}) : {$return->message}." );
 		}
+		$this->register_api_call();
+	}
+
+	private function register_api_call() {
+
 	}
 
 	/**

@@ -16,6 +16,7 @@
 
 class Woozoho_Connector_Zoho_Cache {
 
+	//TODO: Add caching for contacts & taxes.
 	/**
 	 * @var Woozoho_Connector_Zoho_Client
 	 */
@@ -118,11 +119,11 @@ class Woozoho_Connector_Zoho_Cache {
 	public function getItem( $sku ) {
 		$items = $this->getCachedItems();
 
-		foreach ( $items as $key => $item ) {
-			if ( $item["sku"] == $sku ) {
-				Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Item '$sku' found at position " . $key );
+		foreach ( $items as $item ) {
+			if ( $item->sku == $sku ) {
+				Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Item '$sku' found in cache." );
 
-				return $items[ $key ];
+				return $item;
 			}
 		}
 

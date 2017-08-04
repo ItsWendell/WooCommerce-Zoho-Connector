@@ -126,6 +126,8 @@ class Woozoho_Connector_Zoho_Client {
 	/**
 	 * @param WC_Order_Item_Product $item
 	 *
+	 * Required API calls: 2.
+	 *
 	 * @return bool|object
 	 */
 	public function createZohoItem( $item ) {
@@ -244,11 +246,15 @@ class Woozoho_Connector_Zoho_Client {
 	 *    - Schedule a new event?
 	 *    - Update products
 	 *
+	 * Maximum API calls (without caching):
+	 * - 3 for contact info (2 tries, 1 creation)
+	 * - 1-x Possible caching
 	 * - If preference is set to Zoho;
 	 *   - Update woocommerce order and products AFTER being pushed.
 	 */
 	public function pushOrder( $order_id ) {
-		//TODO: Cleanup / breakdown this entire function.
+		//TODO: Cleanup / breakdown this entire function?
+		//TODO: Link orders using a meta fields on both sides?
 		try {
 			$order = new WC_Order( $order_id );
 			if ( empty( $order->user_id ) ) {
@@ -410,6 +416,7 @@ class Woozoho_Connector_Zoho_Client {
 	}
 
 	public function getContact( $contact_name, $email = false ) {
+		//TODO: Link contacts to users using meta field?
 		$args                 = array();
 		$args["contact_name"] = $contact_name;
 		$data                 = $this->zohoAPI->listContacts( $args ); //Find contact by company name.

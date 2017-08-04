@@ -131,6 +131,15 @@ class Woozoho_Connector_Admin {
 				'default'       => 'no',
 				'type'          => 'checkbox',
 				'desc_tip'      => __( 'Only works when dynamic price changes are enabled.', 'woozoho-connector' ),
+				'checkboxgroup' => '',
+			),
+
+			array(
+				'desc'          => __( 'API limit reached', 'woocommerce' ),
+				'id'            => 'wc_zoho_connector_email_notifications_price_changes',
+				'default'       => 'no',
+				'type'          => 'checkbox',
+				'desc_tip'      => __( 'Only works when dynamic price changes are enabled.', 'woozoho-connector' ),
 				'checkboxgroup' => 'end',
 				'autoload'      => false,
 			),
@@ -207,6 +216,18 @@ class Woozoho_Connector_Admin {
 				),
 				'default' => '1 day',
 				'desc'    => __( 'How long is caching valid?', 'woozoho-connector' ),
+				'id'      => 'wc_zoho_connector_api_cache_items'
+			),
+
+			array(
+				'name'    => __( 'Daily API Limit / Zoho Version', 'woozoho-connector' ),
+				'type'    => 'select',
+				'options' => array(
+					'2500' => __( 'Paid Organization (2500 calls/day)', 'woozoho-connector' ),
+					'1000' => __( 'Free Organization (1000 calls/day)', 'woozoho-connector' )
+				),
+				'default' => '1000',
+				'desc'    => __( 'All versions have a 100 calls per minute limit.', 'woozoho-connector' ),
 				'id'      => 'wc_zoho_connector_api_cache_items'
 			),
 
