@@ -228,7 +228,7 @@ class Woozoho_Connector_Admin {
 				),
 				'default' => '1000',
 				'desc'    => __( 'All versions have a 100 calls per minute limit.', 'woozoho-connector' ),
-				'id'      => 'wc_zoho_connector_api_cache_items'
+				'id'      => 'wc_zoho_connector_api_limit'
 			),
 
 			array(
