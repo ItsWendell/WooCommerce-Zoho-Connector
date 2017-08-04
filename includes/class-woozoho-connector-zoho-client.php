@@ -108,11 +108,13 @@ class Woozoho_Connector_Zoho_Client {
 		);
 
 		$result = preg_replace_callback(
-			'/\%(.*?)\%/g',
+			'/\%(.*?)\%/',
 			function ( $match ) use ( $refVars ) {
 				return str_replace( $match[0], isset( $refVars[ $match[1] ] ) ? $refVars[ $match[1] ] : $match[0], $match[0] );
 			},
 			$rawString );
+
+		Woozoho_Connector_Logger::writeDebug( "Reference Number", $result );
 
 		return $result;
 	}
@@ -124,7 +126,8 @@ class Woozoho_Connector_Zoho_Client {
 	 * @return bool|object
 	 */
 	public function createZohoItem( $item ) {
-		//TODO: Handle discounts, return proper order line item.
+		//TODO: Handle discounts, return proper order line item?
+		//TODO: Add support for Taxes (default tax setting or synchronisation of tax classes)
 
 		$product = $item->get_product();
 
@@ -136,7 +139,7 @@ class Woozoho_Connector_Zoho_Client {
 			"name"         => $product->get_name(),
 			"rate"         => $product->get_regular_price(),
 			"description"  => $item->get_product()->get_description(),
-			"sku"          => "s12345",
+			"sku"          => $item->get_product()->get_sku(),
 			"product_type" => "goods"
 		];
 
@@ -145,12 +148,9 @@ class Woozoho_Connector_Zoho_Client {
 		if ( $apiResult->code === 0 ) {
 			Woozoho_Connector_Logger::writeDebug( "Zoho Client", "Successfully created product in Zoho: " . $item->get_name() . " (" . $item->get_product()->get_sku() . ")" );
 
-			return $apiResult->item->item;
+			return $apiResult->item;
 		} else {
 			Woozoho_Connector_Logger::writeDebug( "Zoho Client", "Something went wrong while creating product: " . $item->get_name() );
-			Woozoho_Connector_Logger::writeDebug( "Create Item (API RESULT)", print_r( $apiResult ) );
-			Woozoho_Connector_Logger::writeDebug( "Create Item (Push Data)", print_r( $pushData ) );
-
 			return false;
 		}
 
