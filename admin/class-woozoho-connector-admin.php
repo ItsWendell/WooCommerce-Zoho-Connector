@@ -66,8 +66,6 @@ class Woozoho_Connector_Admin {
 
 	public static function get_settings() {
 		//TODO: Move setings to own file.
-		//TODO: Add update feature to update on-the-fly pricing on Zoho or WooCommerce.
-		//TODO: Change WP to bestelling. (Add option for reference pre-fix)
 
 		$settings = array(
 

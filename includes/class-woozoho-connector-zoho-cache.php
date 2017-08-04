@@ -116,16 +116,19 @@ class Woozoho_Connector_Zoho_Cache {
 	}
 
 	public function getItem( $sku ) {
-		$items      = $this->getCachedItems();
-		$dataColumn = array_column( $items, 'sku' );
-		$key        = array_search( $sku, $dataColumn, true );
-		if ( $key !== false ) {
-			Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Item '$sku' found at position " . $key );
-			return $items[ $key ];
-		} else {
-			Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Item '$sku' not found in cache." );
-			return false;
+		$items = $this->getCachedItems();
+
+		foreach ( $items as $key => $item ) {
+			if ( $item["sku"] == $sku ) {
+				Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Item '$sku' found at position " . $key );
+
+				return $items[ $key ];
+			}
 		}
+
+		Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Item '$sku' not found in cache." );
+
+		return false;
 	}
 
 	public function getCachedItems() {
