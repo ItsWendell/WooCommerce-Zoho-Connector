@@ -123,9 +123,8 @@ class Woozoho_Connector_Admin {
 				'id'            => 'wc_zoho_connector_email_notifications_new_contact',
 				'default'       => 'no',
 				'type'          => 'checkbox',
+				'checkboxgroup' => '',
 				'desc_tip'      => __( 'Send a notification when the connector finds no existing contact and creates a new one.', 'woozoho-connector' ),
-				'checkboxgroup' => 'end',
-				'autoload'      => false,
 			),
 
 			array(
