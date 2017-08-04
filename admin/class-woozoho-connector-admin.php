@@ -128,6 +128,16 @@ class Woozoho_Connector_Admin {
 				'autoload'      => false,
 			),
 
+			array(
+				'desc'          => __( 'Prices are dynamically changed.', 'woocommerce' ),
+				'id'            => 'wc_zoho_connector_email_notifications_price_changes',
+				'default'       => 'no',
+				'type'          => 'checkbox',
+				'desc_tip'      => __( 'Only works when dynamic price changes are enabled.', 'woozoho-connector' ),
+				'checkboxgroup' => 'end',
+				'autoload'      => false,
+			),
+
 			array( 'type' => 'sectionend', 'id' => 'wc_zoho_connector_section_mail_notifications' ),
 
 			array(

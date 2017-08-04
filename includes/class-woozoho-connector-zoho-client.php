@@ -181,6 +181,7 @@ class Woozoho_Connector_Zoho_Client {
 
 		$price_woocommerce = (float) $line_item->get_product()->get_price();
 		$price_zoho        = (float) $zoho_item->rate;
+		$sku               = $line_item->get_product()->get_sku();
 
 		Woozoho_Connector_Logger::writeDebug( "Price Updater", "Pricing preference: $preference, WooCommerce: $price_woocommerce - Zoho: $price_zoho" );
 
@@ -189,15 +190,31 @@ class Woozoho_Connector_Zoho_Client {
 				update_post_meta( $line_item->get_product()->get_id(), '_price', $price_zoho );
 				update_post_meta( $line_item->get_product()->get_id(), '_regular_price', $price_zoho );
 
-				//TODO: Add proper support for updating order items itself, seems harder that it should be.
+				wc_get_order( $order_id )->add_product( $line_item->get_product(), $line_item->get_quantity() );
+				wc_get_order( $order_id )->remove_item( $line_item->get_id() );
+				wc_delete_order_item( $line_item->get_id() );
+				wc_get_order( $order_id )->update_taxes();
+				wc_get_order( $order_id )->calculate_totals();
+				wc_get_order( $order_id )->save();
+
 
 				Woozoho_Connector_Logger::writeDebug( "Price Updater", "Updated WooCommerce pricing to Zoho." );
+
+				if ( Woozoho_Connector::get_option( "email_notifications_price_changes" ) == "yes" ) {
+					$this->sendNotificationEmail( "Price update in WooCommerce: $sku - $price_woocommerce -> $price_zoho",
+						"Price update in WooCommerce: $sku - $price_woocommerce -> $price_zoho" );
+				}
 
 				return $zoho_item;
 			} else if ( $preference == "woocommerce" ) {
 				$update = $this->updateZohoItem( $zoho_item->item_id, [ "rate" => $price_woocommerce ] );
 				if ( $update->code === 0 ) {
 					Woozoho_Connector_Logger::writeDebug( "Price Updater", "Updated Zoho pricing to WooCommerce." );
+
+					if ( Woozoho_Connector::get_option( "email_notifications_price_changes" ) == "yes" ) {
+						$this->sendNotificationEmail( "Price update in Zoho: $sku - $price_zoho -> $price_woocommerce",
+							"Price update in Zoho: $sku - $price_zoho -> $price_woocommerce" );
+					}
 
 					return $update->item;
 				} else {
@@ -368,8 +385,6 @@ class Woozoho_Connector_Zoho_Client {
 
 			$this->zohoAPI->createComment( $salesOrderOutput->salesorder->salesorder_id, $orderComment ); //Adding missing / inactive products.
 
-
-			$order->apply_changes();
 
 			Woozoho_Connector_Logger::writeDebug( "Push Order", "Successfully pushed $order_id to Zoho." );
 

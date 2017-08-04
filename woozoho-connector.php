@@ -28,7 +28,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 final class Woozoho_Connector {
 
 	protected static $_instance = null;
-	public $version = "0.4";
+	public $version = "0.4.1";
 	/**
 	 * @var Woozoho_Connector_Zoho_Client
 	 */
