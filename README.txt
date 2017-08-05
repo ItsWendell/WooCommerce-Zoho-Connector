@@ -1,52 +1,63 @@
-//TODO: UPDATE README.TXT WITH PROPER INFORMATION.
-=== Connector for WooCommerce & Zoho (Books) ===
+=== Connector for WooCommerce & Zoho Books ===
 Contributors: DigiSpark
 Donate link: https://digispark.nl/
 Tags: woocommerce, zoho, synchronisation, api, connector
-Requires at least: 3.0.1
-Tested up to: 4.8
-Stable tag: 4.3
+Requires at least: 4.2
+Tested up to: 4.8.1
+Stable tag: 1.0
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
-Here is a short description of the plugin.  This should be no more than 150 characters.  No markup here.
+A free & feature rich Zoho Books Connector for WooCommerce to dynamically synchronize orders, items, prices and contacts.
 
 == Description ==
 
-This is the long description.  No limit, and you can use Markdown (as well as in the following sections).
+**This is the first open-beta for this connector, it's been tested on multiple live environments. Feedback would be highly appreciated**
 
-For backwards compatibility, if this section is missing, the full length of the short description will be used, and
-Markdown parsed.
+This plugin connects WooCommerce with Zoho Books, it's feature rich and dynamically synchronizes new orders, contacts and products.
 
-A few notes about the sections above:
+*   Routinely, Dynamically or Manually synchronize (new) orders to Zoho
+*   Dynamically adds new contacts to Zoho.
+*   Dynamically creates new items in Zoho if product is not found by SKU
+*   Dynamically updates pricing in WooCommerce or Zoho
+*   Set your own reference number using variables like %order_id% and %site_id%
+*   API caching for Items & Tax rates (limiting API load and faster performance)
+*   Email notifications for specific events
 
-*   "Contributors" is a comma separated list of wp.org/wp-plugins.org usernames
-*   "Tags" is a comma separated list of tags that apply to the plugin
-*   "Requires at least" is the lowest version that the plugin will work on
-*   "Tested up to" is the highest version that you've *successfully used to test the plugin*. Note that it might work on
-higher versions... this is just the highest one you've verified.
-*   Stable tag should indicate the Subversion "tag" of the latest stable version, or "trunk," if you use `/trunk/` for
-stable.
+== The Order Synchronization Process ==
+Order synchronization happens using the wp scheduler, and thus will happen in the background not slow down your users. Here's a quick overview of what happens when a new order has come in from WooCommerce;
 
-    Note that the `readme.txt` of the stable tag is the one that is considered the defining one for the plugin, so
-if the `/trunk/readme.txt` file says that the stable tag is `4.3`, then it is `/tags/4.3/readme.txt` that'll be used
-for displaying information about the plugin.  In this situation, the only thing considered from the trunk `readme.txt`
-is the stable tag pointer.  Thus, if you develop in trunk, you can update the trunk `readme.txt` to reflect changes in
-your in-development version, without having that information incorrectly disclosed about the current stable version
-that lacks those changes -- as long as the trunk's `readme.txt` points to the correct stable tag.
+1.  Plugin receives order from WooCommerce
+2.  Plugin puts the order in a queue to keep track of API failures and new orders.
+3.  Based on your setting it will push directly, every hour, 12 hours or 24 hours.
+4.  Contact will be matched based on name, and if not found email address.
+    - If no contact is found a new one is created based on order details.
+5.  We'll loop through all the items and look them up in either the API cache or live API
+5.  If item is not found we'll either add it as a comment, or create a new product (based on preference)
+6.  Once all the proper information is found we'll attempt to Push to Zoho.
+7.  If something goes wrong you'll receive a notification email (based on setting) and thanks to the queue it will try it again the next hour (or based on the settings)
+8.  If all is good the item will show up in Zoho as a Sales Order concept.
 
-    If no stable tag is provided, it is assumed that trunk is stable, but you should specify "trunk" if that's where
-you put the stable version, in order to eliminate any doubt.
+== Notes ==
+All synchronisation happens dynamically, which means orders placed before the activation of this plug-in won't be synchronized automatically.
+(This CAN be done manually in the bulk options in WooCommerce Orders: Push To Zoho)
+*   **THE PLUGIN WON'T WORK WITHOUT WOOCOMMERCE INSTALLED, AT ALL. IT WILL SELF-DEACTIVATE.**
+*   Product matching is happening based on SKU.
+*   Contact matching is based on contact name or email.
+*   The Test Mode setting will still push to Zoho, but will change the salesorder ID to TEST-%order_id%
+*   New orders will be pushed as a concept.
+*   With debugging enabled it will save the log in the plug-in folder under the file-name: debug_log
 
 == Installation ==
 
 This section describes how to install the plugin and get it working.
 
-e.g.
-
-1. Upload `woozoho-connector.php` to the `/wp-content/plugins/` directory
-1. Activate the plugin through the 'Plugins' menu in WordPress
-1. Place `<?php do_action('plugin_name_hook'); ?>` in your templates
+1. Upload all contents of the archive in the plug-ins folder in it's own map e.g. woozoho-connector.
+2. Activate the plugin through the 'Plugins' menu in WordPress
+3. Setup all your preferences and API data on the settings page:
+   WooCommerce -> Settings -> Zoho Connector (tab)
+4. Put plug-in in 'test mode', do a test order to make sure all is working.
+5. Tada! Your WooCommerce & Zoho Books are now one!
 
 == Frequently Asked Questions ==
 
@@ -60,56 +71,11 @@ Answer to foo bar dilemma.
 
 == Screenshots ==
 
-1. This screen shot description corresponds to screenshot-1.(png|jpg|jpeg|gif). Note that the screenshot is taken from
-the /assets directory or the directory that contains the stable readme.txt (tags or trunk). Screenshots in the /assets
-directory take precedence. For example, `/assets/screenshot-1.png` would win over `/tags/4.3/screenshot-1.png`
-(or jpg, jpeg, gif).
+1. Settings page
+2. Bulk Option
 2. This is the second screen shot
 
 == Changelog ==
 
-= 1.0 =
-* A change since the previous version.
-* Another change.
-
-= 0.5 =
-* List versions from most recent at top to oldest at bottom.
-
-== Upgrade Notice ==
-
-= 1.0 =
-Upgrade notices describe the reason a user should upgrade.  No more than 300 characters.
-
-= 0.5 =
-This version fixes a security related bug.  Upgrade immediately.
-
-== Arbitrary section ==
-
-You may provide arbitrary sections, in the same format as the ones above.  This may be of use for extremely complicated
-plugins where more information needs to be conveyed that doesn't fit into the categories of "description" or
-"installation."  Arbitrary sections will be shown below the built-in sections outlined above.
-
-== A brief Markdown Example ==
-
-Ordered list:
-
-1. Some feature
-1. Another feature
-1. Something else about the plugin
-
-Unordered list:
-
-* something
-* something else
-* third thing
-
-Here's a link to [WordPress](http://wordpress.org/ "Your favorite software") and one to [Markdown's Syntax Documentation][markdown syntax].
-Titles are optional, naturally.
-
-[markdown syntax]: http://daringfireball.net/projects/markdown/syntax
-            "Markdown is what the parser uses to process much of the readme file"
-
-Markdown uses email style notation for blockquotes and I've been told:
-> Asterisks for *emphasis*. Double it up  for **strong**.
-
-`<?php code(); // goes in backticks ?>`
+= 0.6 =
+* First stable and production ready public beta.

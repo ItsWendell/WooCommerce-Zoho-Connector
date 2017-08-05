@@ -354,7 +354,19 @@ class Woozoho_Connector_Zoho_Client {
 			}
 
 			if ( empty( $salesOrder["line_items"] ) ) {
-				Throw new Exception( "No items found or connected to this order." );
+				$placeholder_sku = Woozoho_Connector::get_option( "item_placeholder" );
+				if ( ! empty( $placeholder_sku ) ) {
+					$item = $this->getItem( $placeholder_sku );
+					if ( $item ) {
+						$line_item                  = $this->itemConvert( $item, false );
+						$salesOrder["line_items"][] = $line_item;
+
+					} else {
+						Throw new Exception( "Placeholder item with SKU $placeholder_sku is not found." );
+					}
+				} else {
+					Throw new Exception( "No items found or connected to this order." );
+				}
 			}
 
 			//Handle Notes

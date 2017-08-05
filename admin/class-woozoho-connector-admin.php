@@ -289,6 +289,14 @@ class Woozoho_Connector_Admin {
 			),
 
 			array(
+				'name'    => __( 'Item placeholder SKU', 'woozoho-connector' ),
+				'type'    => 'text',
+				'default' => 'PLACEHOLDER',
+				'desc'    => __( 'Being used when item creation is disabled to fill in the order if no products are found.', 'woozoho-connector' ),
+				'id'      => 'wc_zoho_connector_item_placeholder'
+			),
+
+			array(
 				'type' => 'sectionend',
 				'id'   => 'wc_zoho_connector_section_advanced_settings'
 			)
