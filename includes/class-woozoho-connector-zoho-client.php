@@ -170,6 +170,96 @@ class Woozoho_Connector_Zoho_Client {
 	 * @return bool|object
 	 */
 
+	public function sync_prices() {
+		try {
+
+			//TODO: Take care of API limit of 100 calls / minute.
+			$preference    = Woozoho_Connector::get_option( "pricing" );
+			$updated_items = 0;
+			$conflicts     = 0;
+
+			if ( $this->cache->cacheItems() ) {
+				$wc_products = new WP_Query( array(
+					'post_type'      => array( 'product', 'product_variation' ),
+					'posts_per_page' => - 1
+				) );
+
+				Woozoho_Connector_Logger::writeDebug( "Price Sync", "Syncing prices of " . $wc_products->post_count . " products, pricing preference is set to " . $preference );
+
+				while ( $wc_products->have_posts() ) : $wc_products->the_post();
+					$pid        = get_the_ID();
+					$wc_product = wc_get_product( $pid );
+					if ( ! $wc_product ) {
+						$conflicts ++;
+						Woozoho_Connector_Logger::writeDebug( "Price Sync", "Product " . get_the_title() . " ($pid) is invalid or broken." );
+						continue;
+					}
+					$sku = $wc_product->get_sku();
+
+					if ( empty( $sku ) ) {
+						$conflicts ++;
+						Woozoho_Connector_Logger::writeDebug( "Price Sync", "Product " . $wc_product->get_name() . " ($pid) has no SKU." );
+						continue;
+					}
+
+					$zoho_product = $this->cache->getItem( $sku );
+
+					if ( ! $zoho_product ) {
+						$conflicts ++;
+						Woozoho_Connector_Logger::writeDebug( "Price Sync", "Product SKU $sku not found in cache." );
+						continue;
+					}
+
+					$price_zoho        = (float) $zoho_product->rate;
+					$price_woocommerce = (float) $wc_product->get_regular_price();
+
+					if ( $price_zoho == $price_woocommerce ) {
+						Woozoho_Connector_Logger::writeDebug( "Price Sync", "No price updated needed for $sku" );
+						continue;
+					}
+
+					switch ( $preference ) {
+						case "zoho": {
+							$wc_product->set_regular_price( $price_zoho );
+							if ( ! $wc_product->is_on_sale() ) {
+								$wc_product->set_price( $price_zoho );
+							}
+							$wc_product->save();
+							$wc_product->save_meta_data();
+							Woozoho_Connector_Logger::writeDebug( "Price Sync", "Successfully updated price of $sku in WooCommerce, $price_woocommerce -> $price_zoho" );
+							$updated_items ++;
+							continue;
+						}
+
+						case "woocommerce": {
+							$update = $this->updateZohoItem( $zoho_product->item_id, [ "rate" => $price_woocommerce ] );
+							if ( $update->code === 0 ) {
+								Woozoho_Connector_Logger::writeDebug( "Price Sync", "Successfully updated price of $sku in Zoho, $price_zoho -> $price_woocommerce" );
+								$updated_items ++;
+							} else {
+
+							}
+						}
+					}
+
+					Woozoho_Connector_Logger::writeDebug( "Price Sync", "Updated the price of $updated_items with $conflicts conflicts." );
+				endwhile;
+			} else {
+				Throw new Exception( "Something went wrong with the cache." );
+			}
+		} catch ( Exception $e ) {
+			Woozoho_Connector_Logger::writeDebug( "Price Sync", "ERROR: " . $e->getMessage() );
+		}
+	}
+
+	/**
+	 * @param WC_order_Item_Product $line_item
+	 * @param $zoho_item
+	 * @param $order_id
+	 * @param bool $preference
+	 *
+	 * @return mixed
+	 */
 	public function update_pricing( $line_item, $zoho_item, $order_id, $preference = false ) {
 		if ( empty( $line_item ) || empty( $zoho_item ) ) {
 			Woozoho_Connector_Logger::writeDebug( "Price Updater", "Skipping updates, WooCommerce or Zoho Item is empty." );
@@ -181,7 +271,7 @@ class Woozoho_Connector_Zoho_Client {
 			$preference = Woozoho_Connector::get_option( "pricing" );
 		}
 
-		$price_woocommerce = (float) $line_item->get_product()->get_price();
+		$price_woocommerce = (float) $line_item->get_product()->get_regular_price();
 		$price_zoho        = (float) $zoho_item->rate;
 		$sku               = $line_item->get_product()->get_sku();
 
@@ -257,6 +347,7 @@ class Woozoho_Connector_Zoho_Client {
 		//TODO: Link orders using a meta fields on both sides?
 		try {
 			$order = new WC_Order( $order_id );
+
 			if ( empty( $order->user_id ) ) {
 				throw new Exception( "User id not found." );
 			}
@@ -394,7 +485,7 @@ class Woozoho_Connector_Zoho_Client {
 
 			$order_status_setting = Woozoho_Connector::get_option( "pushed_order_status" );
 			if ( $order_status_setting != $order->get_status() ) {
-				$order->set_status( $order_status_setting );
+				$order->update_status( $order_status_setting );
 			}
 
 			//Add Payment Method As Notes;
@@ -596,6 +687,18 @@ class Woozoho_Connector_Zoho_Client {
 		} else {
 			wp_schedule_single_event( time(), 'woozoho_push_order_queue', array( $post_id ) );
 		}
+	}
+
+	public function schedule_sync_prices( $timestamp = false ) {
+
+
+		if ( $timestamp !== false ) {
+			wp_schedule_single_event( $timestamp, 'woozoho_sync_prices' );
+		} else {
+			wp_schedule_single_event( time(), 'woozoho_sync_prices' );
+		}
+
+		Woozoho_Connector_Logger::writeDebug( "Price Sync", "Scheduled price sync." );
 	}
 
 	/**

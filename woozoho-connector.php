@@ -4,7 +4,7 @@
  * Plugin Name: Connector for WooCommerce & Zoho
  * Plugin URI: https://digispark.nl/lab/connector-woocommerce-zoho/
  * Description: A feature rich connector that binds & synchronizes WooCommerce to Zoho.
- * Version: 0.3
+ * Version: 0.6
  * Author: DigiSpark
  * Author URI: https://digispark.nl/
  * Requires at least: 4.4
@@ -28,7 +28,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 final class Woozoho_Connector {
 
 	protected static $_instance = null;
-	public $version = "0.5.4";
+	public $version = "0.6";
 	/**
 	 * @var Woozoho_Connector_Zoho_Client
 	 */
@@ -165,9 +165,13 @@ final class Woozoho_Connector {
 		//WooCommerce Prepare New Order for Push to Zoho
 		$this->loader->add_action( 'woocommerce_new_order', $plugin_admin, 'scheduleOrder', 20, 1 );
 
+
 		//Notices
 		$this->loader->add_action( 'admin_notices', $plugin_admin, 'woocommerce_zoho_connector_admin_notices' );
+
+
 		$this->loader->add_action( 'woozoho_push_order_queue', $plugin_admin, 'pushOrder', 10, 1 );
+		$this->loader->add_action( 'woozoho_sync_prices', $plugin_admin, 'sync_prices' );
 	}
 
 	private function int_cron_jobs() {

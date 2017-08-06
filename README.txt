@@ -1,7 +1,7 @@
 === Connector for WooCommerce & Zoho Books ===
 Contributors: DigiSpark
 Donate link: https://digispark.nl/
-Tags: woocommerce, zoho, synchronisation, api, connector
+Tags: woocommerce, zoho, zoho books, books, synchronisation, api, connector
 Requires at least: 4.2
 Tested up to: 4.8.1
 Stable tag: 1.0
@@ -14,7 +14,7 @@ A free & feature rich Zoho Books Connector for WooCommerce to dynamically synchr
 
 **This is the first open-beta for this connector, it's been tested on multiple live environments. Feedback would be highly appreciated**
 
-This plugin connects WooCommerce with Zoho Books, it's feature rich and dynamically synchronizes new orders, contacts and products.
+This plugin connects WooCommerce with Zoho Books, it's feature rich and dynamically synchronizes new orders, prices, contacts and products.
 
 *   Routinely, Dynamically or Manually synchronize (new) orders to Zoho
 *   Dynamically adds new contacts to Zoho.

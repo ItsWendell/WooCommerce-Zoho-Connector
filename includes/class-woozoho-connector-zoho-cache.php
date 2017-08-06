@@ -22,6 +22,7 @@ class Woozoho_Connector_Zoho_Cache {
 	 */
 	protected $cacheDir;
 	protected $apiCachingItemsTimeout;
+	protected $cacheContent;
 
 	/**
 	 * Woozoho_Connector_Zoho_Cache constructor.
@@ -105,6 +106,7 @@ class Woozoho_Connector_Zoho_Cache {
 		if ( ! empty( $itemsCache ) ) {
 			if ( file_put_contents( $cacheFile, json_encode( $itemsCache ) ) ) {
 				Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Successfully wrote items to cache." );
+				$this->cacheContent = $itemsCache;
 				return true;
 			} else {
 				Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Error something went wrong with writing to items cache, check file permissions!" );
@@ -133,9 +135,15 @@ class Woozoho_Connector_Zoho_Cache {
 	}
 
 	public function getCachedItems() {
-		$cacheData = file_get_contents( WOOZOHO_CACHE_DIR . "items.json" );
+		if ( empty( $this->cacheContent ) ) {
+			$cacheData          = json_decode( file_get_contents( WOOZOHO_CACHE_DIR . "items.json" ) );
+			$this->cacheContent = $cacheData;
+		} else {
+			$cacheData = $this->cacheContent;
+		}
+
 		if ( $cacheData ) {
-			$returnData = json_decode( $cacheData );
+			$returnData = $cacheData;
 			Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Items in cache: " . count( $returnData ) );
 
 			return $returnData;

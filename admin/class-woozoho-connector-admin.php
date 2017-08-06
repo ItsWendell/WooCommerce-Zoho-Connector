@@ -54,19 +54,19 @@ class Woozoho_Connector_Admin {
 	public static function woocommerce_update_settings() {
 		$oldOrderRecurrence = Woozoho_Connector::get_option( "cron_orders_recurrence" );
 		Woozoho_Connector_Logger::writeDebug( "Settings", "Settings updated!" );
-		$data = Woozoho_Connector::get_option( "notify_email_option" );
-		Woozoho_Connector_Logger::writeDebug( "Settings",
-			"Settings data: " .
-			print_r( $data->zoho_sku, true ) );
 		woocommerce_update_options( self::get_settings() );
 		if ( $oldOrderRecurrence != Woozoho_Connector::get_option( "cron_orders_recurrence" ) ) {
 			Woozoho_Connector()->cron_jobs->updateOrdersJob( Woozoho_Connector::get_option( "cron_orders_recurrence" ) );
 		}
 	}
 
-	public static function get_settings() {
-		//TODO: Move setings to own file.
+	public static function get_action_url( $action ) {
+		$current_url = menu_page_url( "wc-settings", false );
 
+		return $current_url . "&tab=zoho_connector&action=" . $action;
+	}
+
+	public static function get_settings() {
 		$settings = array(
 
 			array(
@@ -132,16 +132,6 @@ class Woozoho_Connector_Admin {
 				'type'          => 'checkbox',
 				'desc_tip'      => __( 'Only works when dynamic price changes are enabled.', 'woozoho-connector' ),
 				'checkboxgroup' => '',
-			),
-
-			array(
-				'desc'          => __( 'API limit reached', 'woocommerce' ),
-				'id'            => 'wc_zoho_connector_email_notifications_price_changes',
-				'default'       => 'no',
-				'type'          => 'checkbox',
-				'desc_tip'      => __( 'Only works when dynamic price changes are enabled.', 'woozoho-connector' ),
-				'checkboxgroup' => 'end',
-				'autoload'      => false,
 			),
 
 			array( 'type' => 'sectionend', 'id' => 'wc_zoho_connector_section_mail_notifications' ),
@@ -314,20 +304,8 @@ class Woozoho_Connector_Admin {
 	 */
 	public function enqueue_styles() {
 
-		/**
-		 * This function is provided for demonstration purposes only.
-		 *
-		 * An instance of this class should be passed to the run() function
-		 * defined in Woozoho_Connector_Loader as all of the hooks are defined
-		 * in that particular class.
-		 *
-		 * The Woozoho_Connector_Loader will then create the relationship
-		 * between the defined hooks and the functions defined in this
-		 * class.
-		 */
-
-		wp_enqueue_style( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'css/woozoho-connector-admin.css', array(), $this->version, 'all' );
-
+		//wp_enqueue_style( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'css/woozoho-connector-admin.css', array(), $this->version, 'all' );
+		//Not being used right now.
 	}
 
 	//WooCommerce Settings Tab Functionality
@@ -339,25 +317,13 @@ class Woozoho_Connector_Admin {
 	 */
 	public function enqueue_scripts() {
 
-		/**
-		 * This function is provided for demonstration purposes only.
-		 *
-		 * An instance of this class should be passed to the run() function
-		 * defined in Woozoho_Connector_Loader as all of the hooks are defined
-		 * in that particular class.
-		 *
-		 * The Woozoho_Connector_Loader will then create the relationship
-		 * between the defined hooks and the functions defined in this
-		 * class.
-		 */
-
-		wp_enqueue_script( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'js/woozoho-connector-admin.js', array( 'jquery' ), $this->version, false );
-
+		//wp_enqueue_script( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'js/woozoho-connector-admin.js', array( 'jquery' ), $this->version, false );
+		//Not being used right now.
 	}
 
 	public function add_action_links( $links ) {
 		$settings_link = array(
-			'<a href="' . admin_url( 'admin.php?page=wc-settings&tab=zoho_connector">' . __( 'Settings', $this->plugin_name ) . '</a>' )
+			'<a href="' . admin_url( 'admin.php?page=wc-settings&tab=zoho_connector">' . __( 'Settings', 'woozoho-connector' ) . '</a>' )
 		);
 
 		return array_merge( $settings_link, $links );
@@ -369,7 +335,7 @@ class Woozoho_Connector_Admin {
 		return $settings_tabs;
 	}
 
-	function woocommerce_add_bulk_actions( $bulk_actions ) {
+	public function woocommerce_add_bulk_actions( $bulk_actions ) {
 		$bulk_actions['send_zoho'] = __( 'Push To Zoho', 'woozoho-connector' );
 
 		return $bulk_actions;
@@ -382,7 +348,7 @@ class Woozoho_Connector_Admin {
 	 *
 	 * @return string
 	 */
-	function woocommerce_bulk_action_send_zoho( $redirect_to, $action, $post_ids ) {
+	public function woocommerce_bulk_action_send_zoho( $redirect_to, $action, $post_ids ) {
 		if ( $action !== 'send_zoho' ) {
 			return $redirect_to;
 		}
@@ -396,7 +362,7 @@ class Woozoho_Connector_Admin {
 		return $redirect_to;
 	}
 
-	function woocommerce_zoho_connector_admin_notices() {
+	public function woocommerce_zoho_connector_admin_notices() {
 		if ( ! empty( $_REQUEST['bulk_send_zoho'] ) ) {
 			$orders_count = intval( $_REQUEST['bulk_send_zoho'] );
 
@@ -409,8 +375,12 @@ class Woozoho_Connector_Admin {
 		}
 	}
 
-	function pushOrder( $order_id ) {
+	public function pushOrder( $order_id ) {
 		Woozoho_Connector()->client->pushOrder( $order_id );
+	}
+
+	public function sync_prices() {
+		Woozoho_Connector()->client->sync_prices();
 	}
 
 	public function woocommerce_settings_tab() {
@@ -440,5 +410,4 @@ class Woozoho_Connector_Admin {
 			Woozoho_Connector()->client->getOrdersQueue()->addOrder( $order_id );
 		}
 	}
-	//END
 }
