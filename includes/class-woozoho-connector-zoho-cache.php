@@ -22,7 +22,8 @@ class Woozoho_Connector_Zoho_Cache {
 	 */
 	protected $cacheDir;
 	protected $apiCachingItemsTimeout;
-	protected $cacheContent;
+	protected $items_cache;
+	protected $taxes_cache;
 
 	/**
 	 * Woozoho_Connector_Zoho_Cache constructor.
@@ -49,9 +50,10 @@ class Woozoho_Connector_Zoho_Cache {
 	public function checkItemsCache( $make_valid = false ) {
 		Woozoho_Connector_Logger::writeDebug( "API Cache", "Checking if cache is valid." );
 		/** @noinspection PhpUndefinedConstantInspection */
-		$cacheFile = $this->cacheDir . "items.json";
-		if ( file_exists( $cacheFile ) ) {
-			$fileTime   = filectime( $cacheFile );
+		$itemsFile = $this->cacheDir . "items.json";
+		$taxesFile = $this->cacheDir . "taxes.json";
+		if ( file_exists( $itemsFile ) && file_exists( $taxesFile ) ) {
+			$fileTime   = filectime( $itemsFile );
 			$nowTime    = time();
 			$expireTime = strtotime( "+ " . $this->apiCachingItemsTimeout, $fileTime );
 
@@ -63,9 +65,10 @@ class Woozoho_Connector_Zoho_Cache {
 				return true;
 			} else {
 				Woozoho_Connector_Logger::writeDebug( "API Cache", "Cache is outdated, removing..." );
-				unlink( $fileTime ); //Removing expired cache.
+				unlink( $itemsFile ); //Removing expired cache.
+				unlink( $taxesFile );
 				if ( $make_valid ) {
-					if ( $this->cacheItems() ) {
+					if ( $this->cacheItems() && $this->cacheItems() ) {
 						return true;
 					}
 				}
@@ -75,10 +78,32 @@ class Woozoho_Connector_Zoho_Cache {
 		} else {
 			Woozoho_Connector_Logger::writeDebug( "API Cache", "No cache file is available." );
 			if ( $make_valid ) {
-				if ( $this->cacheItems() ) {
+				if ( $this->cacheItems() && $this->cacheTaxes() ) {
 					return true;
 				}
 			}
+
+			return false;
+		}
+	}
+
+	public function cacheTaxes() {
+		$taxes     = Woozoho_Connector()->client->get_taxes();
+		$cacheFile = $this->cacheDir . "taxes.json";
+
+		if ( ! empty( $taxes ) ) {
+			if ( file_put_contents( $cacheFile, json_encode( $taxes ) ) ) {
+				Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Successfully wrote taxes to cache." );
+				$this->taxes_cache = $taxes;
+
+				return true;
+			} else {
+				Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Error something went wrong with writing to taxes cache, check file permissions!" );
+
+				return false;
+			}
+		} else {
+			unlink( $cacheFile );
 
 			return false;
 		}
@@ -106,7 +131,7 @@ class Woozoho_Connector_Zoho_Cache {
 		if ( ! empty( $itemsCache ) ) {
 			if ( file_put_contents( $cacheFile, json_encode( $itemsCache ) ) ) {
 				Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Successfully wrote items to cache." );
-				$this->cacheContent = $itemsCache;
+				$this->items_cache = $itemsCache;
 				return true;
 			} else {
 				Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Error something went wrong with writing to items cache, check file permissions!" );
@@ -123,28 +148,68 @@ class Woozoho_Connector_Zoho_Cache {
 
 		foreach ( $items as $item ) {
 			if ( $item->sku == $sku ) {
-				Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Item '$sku' found in cache." );
+				//Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Item '$sku' found in cache." );
 
 				return $item;
 			}
 		}
 
-		Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Item '$sku' not found in cache." );
+		//Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Item '$sku' not found in cache." );
+
+		return false;
+	}
+
+	public function getTax( $tax_percentage, $tax_name = null ) {
+		$taxes = $this->getCachedTaxes();
+
+		foreach ( $taxes as $tax ) {
+			if ( $tax_name != null ) {
+				if ( $tax->tax_name == $tax_name ) {
+					return $tax;
+				}
+			}
+
+			if ( $tax_percentage != false ) {
+				if ( $tax_percentage == $tax->tax_percentage ) {
+					return $tax;
+				}
+			}
+		}
 
 		return false;
 	}
 
 	public function getCachedItems() {
-		if ( empty( $this->cacheContent ) ) {
-			$cacheData          = json_decode( file_get_contents( WOOZOHO_CACHE_DIR . "items.json" ) );
-			$this->cacheContent = $cacheData;
+		if ( empty( $this->items_cache ) ) {
+			$cacheData         = json_decode( file_get_contents( WOOZOHO_CACHE_DIR . "items.json" ) );
+			$this->items_cache = $cacheData;
 		} else {
-			$cacheData = $this->cacheContent;
+			$cacheData = $this->items_cache;
 		}
 
 		if ( $cacheData ) {
 			$returnData = $cacheData;
-			Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Items in cache: " . count( $returnData ) );
+
+			//Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Items in cache: " . count( $returnData ) );
+
+			return $returnData;
+		} else {
+			return false;
+		}
+	}
+
+	public function getCachedTaxes() {
+		if ( empty( $this->taxes_cache ) ) {
+			$cacheData         = json_decode( file_get_contents( WOOZOHO_CACHE_DIR . "taxes.json" ) );
+			$this->taxes_cache = $cacheData;
+		} else {
+			$cacheData = $this->items_cache;
+		}
+
+		if ( $cacheData ) {
+			$returnData = $cacheData;
+
+			//Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Items in cache: " . count( $returnData ) );
 
 			return $returnData;
 		} else {

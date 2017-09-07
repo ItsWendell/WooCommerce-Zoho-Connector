@@ -172,6 +172,7 @@ final class Woozoho_Connector {
 
 		$this->loader->add_action( 'woozoho_push_order_queue', $plugin_admin, 'pushOrder', 10, 1 );
 		$this->loader->add_action( 'woozoho_sync_prices', $plugin_admin, 'sync_prices' );
+		$this->loader->add_action( 'woozoho_sku_checker', $plugin_admin, 'sku_checker' );
 	}
 
 	private function int_cron_jobs() {

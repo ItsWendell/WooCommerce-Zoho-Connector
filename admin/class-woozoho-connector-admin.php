@@ -222,6 +222,26 @@ class Woozoho_Connector_Admin {
 			),
 
 			array(
+				'name'    => __( 'Shipping Handling', 'woozoho-connector' ),
+				'type'    => 'select',
+				'options' => array(
+					'native'    => __( 'Native (native in invoice)', 'woozoho-connector' ),
+					'line-item' => __( 'Line Item (as a product)', 'woozoho-connector' )
+				),
+				'default' => 'line-item',
+				'desc'    => __( 'The native shipping line in the invoices do not support taxes, choose line-item if you need taxes to be calculated. The product price will change for each other based on shipping price of that order.', 'woozoho-connector' ),
+				'id'      => 'wc_zoho_connector_shipping_invoice_method'
+			),
+
+			array(
+				'name'    => __( 'Shipping Line-Item SKU', 'woozoho-connector' ),
+				'type'    => 'text',
+				'default' => 'SHIPPING-COST',
+				'desc'    => __( 'Is only being used for line-item shipping handling. Creates product with sku if it does not exist.', 'woozoho-connector' ),
+				'id'      => 'wc_zoho_connector_shipping_invoice_item_sku'
+			),
+
+			array(
 				'name'    => __( 'Reference Number Format', 'woozoho-connector' ),
 				'type'    => 'text',
 				'default' => ( is_multisite() == true ) ? 'WP-%post_id%-%blog_id%' : 'WP-%post_id%',
@@ -381,6 +401,10 @@ class Woozoho_Connector_Admin {
 
 	public function sync_prices() {
 		Woozoho_Connector()->client->sync_prices();
+	}
+
+	public function sku_checker() {
+		Woozoho_Connector()->client->sku_checker();
 	}
 
 	public function woocommerce_settings_tab() {

@@ -189,6 +189,10 @@ class Woozoho_Connector_Zoho_API {
 		return $this->curlRequest( "/items/", 'GET', $filters );
 	}
 
+	public function listTaxes() {
+		return $this->curlRequest( "/settings/taxes", 'GET' );
+	}
+
 	/**
 	 * Deletes an item
 	 *

@@ -81,6 +81,16 @@ class Woozoho_Connector_Zoho_Client {
 		return $returnData;
 	}
 
+	public function get_taxes() {
+		Woozoho_Connector_Logger::writeDebug( "Zoho Client", "Getting Taxes..." );
+		$api_result = $this->zohoAPI->listTaxes();
+		if ( count( $api_result->taxes ) != 0 ) {
+			return $api_result->taxes;
+		}
+
+		return false;
+	}
+
 	public function sendNotificationEmail( $subject, $message ) {
 		$mailTo = Woozoho_Connector::get_option( "notify_email" );
 		if ( $mailTo ) {
@@ -145,6 +155,7 @@ class Woozoho_Connector_Zoho_Client {
 			"rate"         => $product->get_regular_price(),
 			"description"  => $item->get_product()->get_description(),
 			"sku"          => $item->get_product()->get_sku(),
+			"tax_id"       => 200451000001689003,
 			"product_type" => "goods"
 		];
 
@@ -158,7 +169,49 @@ class Woozoho_Connector_Zoho_Client {
 			Woozoho_Connector_Logger::writeDebug( "Zoho Client", "Something went wrong while creating product: " . $item->get_name() );
 			return false;
 		}
+	}
 
+	public function getShippingLineItem( $shipping_cost, $shipping_tax = false ) {
+		$item_sku_option = Woozoho_Connector::get_option( "shipping_invoice_item_sku" );
+		$item_sku        = ! empty( $item_sku_option ) ? $item_sku_option : "SHIPPING-COST";
+		$item            = $this->getItem( $item_sku );
+
+		if ( ! $item ) {
+			$params = [
+				"name"         => 'Shipping Costs',
+				"rate"         => '0',
+				"description"  => 'Item for shipping costs.',
+				"sku"          => $item_sku,
+				"tax_id"       => 200451000001689003,
+				"product_type" => "service"
+			];
+
+			$api_result = $this->zohoAPI->createItem( $params );
+
+			if ( $api_result->code === 0 ) {
+				Woozoho_Connector_Logger::writeDebug( "Zoho Client", "Successfully created shipping costs product." );
+				$item = $api_result->item;
+
+			} else {
+				Woozoho_Connector_Logger::writeDebug( "Zoho Client", "Something went wrong while creating product for Shipping Costs (SHIPPING-COSTS)" );
+
+				return false;
+			}
+		}
+
+		$converted_item = array(
+			"item_id"     => $item->item_id,
+			"rate"        => $shipping_cost,
+			"name"        => $item->name,
+			"description" => $item->description,
+			"tax_id"      => 200451000001689003,
+			"unit"        => "unit",
+			"quantity"    => 1,
+		);
+
+		//TODO: Fix taxes on every level instead of hardcoded tax
+
+		return $converted_item;
 	}
 
 	/**
@@ -169,6 +222,86 @@ class Woozoho_Connector_Zoho_Client {
 	 * Returns updated line_item
 	 * @return bool|object
 	 */
+
+	//TODO: WARNING: Make sure your Tax names are the same in WooCommerce as in Zoho! DO NOT CHANGE YOUR TAX ITEMS IN ZOHO BOOKS. THIS MIGHT CAUSE CUNFUSION.
+
+	public function tax_fixer() {
+		/*
+		if ( $this->cache->cacheItems() ) {
+			$wc_products = new WP_Query( array(
+				'post_type'      => array( 'product', 'product_variation' ),
+				'posts_per_page' => - 1
+			) );
+			$zoho_products = $this->cache->getCachedItems();
+
+			Woozoho_Connector_Logger::writeDebug( "Tax Fixer", "Fixing Tax ID's  of " . $wc_products->post_count . " products.");
+
+			foreach($zoho_products as $zoho_item)
+			{
+				$this->zohoAPI->updateItem($zoho_item->item_id,array(''))
+				if($zoho_item->tax_id != "200451000001689003")
+				{
+					Woozoho_Connector_Logger::writeDebug( "Tax Fixer", "Fixing $zoho_item->sku: ");
+				}
+			}
+		}
+		*/
+
+		return false;
+	}
+
+	public function sku_checker() {
+		$preference    = Woozoho_Connector::get_option( "pricing" );
+		$updated_items = 0;
+		$conflicts     = 0;
+
+		if ( $this->cache->cacheItems() ) {
+			$wc_products = new WP_Query( array(
+				'post_type'      => array( 'product', 'product_variation' ),
+				'posts_per_page' => - 1
+			) );
+
+			Woozoho_Connector_Logger::writeDebug( "SKU Checker", "Checking SKU's of " . $wc_products->post_count . " products, pricing preference is set to " . $preference );
+
+			while ( $wc_products->have_posts() ) : $wc_products->the_post();
+				$pid        = get_the_ID();
+				$wc_product = wc_get_product( $pid );
+				if ( ! $wc_product ) {
+					$conflicts ++;
+					Woozoho_Connector_Logger::writeDebug( "SKU Checker", "Product " . get_the_title() . " ($pid): is invalid or broken." );
+					continue;
+				}
+				$sku = $wc_product->get_sku();
+
+				if ( empty( $sku ) ) {
+					$conflicts ++;
+					Woozoho_Connector_Logger::writeDebug( "SKU Checker", "Product " . get_the_title() . " ($pid): has no SKU." );
+					continue;
+				}
+
+				$zoho_product = $this->cache->getItem( $sku );
+
+				if ( ! $zoho_product ) {
+					$conflicts ++;
+					Woozoho_Connector_Logger::writeDebug( "SKU Checker", "Product SKU: $sku (" . get_the_title() . " - $pid): Not found in Zoho." );
+					continue;
+				}
+
+				$price_zoho        = (float) $zoho_product->rate;
+				$price_woocommerce = (float) $wc_product->get_regular_price();
+
+				if ( $price_zoho == $price_woocommerce ) {
+					Woozoho_Connector_Logger::writeDebug( "SKU Checker", "Product SKU: $sku (" . get_the_title() . " - $pid): Product found in Zoho. Prices are the same! Great :)" );
+					continue;
+				}
+
+				Woozoho_Connector_Logger::writeDebug( "SKU Checker", "Product SKU: $sku (" . get_the_title() . " - $pid): Product found in Zoho. Price Difference: (Zoho) $price_zoho | (WooCommerce) $price_woocommerce" );
+
+
+			endwhile;
+			Woozoho_Connector_Logger::writeDebug( "SKU Checker", "SKU CHECKER FINISHED :)" );
+		}
+	}
 
 	public function sync_prices() {
 		try {
@@ -320,6 +453,8 @@ class Woozoho_Connector_Zoho_Client {
 
 			return $zoho_item;
 		}
+
+		return false;
 	}
 
 	public function updateZohoItem( $item_id, $changes ) {
@@ -457,6 +592,31 @@ class Woozoho_Connector_Zoho_Client {
 					}
 				} else {
 					Throw new Exception( "No items found or connected to this order." );
+				}
+			}
+
+			//Shipping
+			if ( $order->get_shipping_total() ) {
+
+				$shipping_total          = $order->get_shipping_total();
+				$shipping_tax            = $order->get_shipping_tax();
+				$shipping_invoice_method = Woozoho_Connector::get_option( "shipping_invoice_method" );
+
+				Woozoho_Connector_Logger::writeDebug( "Push Order",
+					"Shipping Total: " . $shipping_total . " - Shipping Tax: " . $order->get_shipping_tax() . " Total: " .
+					$salesOrder["shipping_charge"] . "Invoice Method: " . $shipping_invoice_method );
+
+				if ( $shipping_invoice_method == 'line-item' ) {
+					$shipping_line_item = $this->getShippingLineItem( $shipping_total );
+					if ( ! $shipping_line_item ) {
+						$missingProducts .= "Something went wrong with processing shipping costs!";
+						Woozoho_Connector_Logger::writeDebug( "Push Order", "Something went wrong with processing shipping costs!" );
+					} else {
+						array_push( $salesOrder["line_items"], $shipping_line_item );
+						Woozoho_Connector_Logger::writeDebug( "Push Order", "Successfully added shipping costs as a line_item!" );
+					}
+				} else {
+					$salesOrder["shipping_charge"] = (float) $shipping_total + (float) $shipping_tax;
 				}
 			}
 
@@ -611,6 +771,7 @@ class Woozoho_Connector_Zoho_Client {
 		if ( $useCaching && ( $checkCaching ? $this->getCache()->checkItemsCache() : true ) && $this->getCache()->isEnabled() ) { //Check if caching is enabled & valid
 			$item = $this->cache->getItem( $sku );
 			if ( $item ) {
+				Woozoho_Connector_Logger::writeDebug( "Tax Checker", "Tax ID: " . $item->tax_id . " - tax_name: " . $item->tax_name . " - tax_percentage: " . $item->tax_percentage . " - tax_type: " . $item->tax_type );
 				return $item;
 			}
 		} else { //Caching not enabled or valid
@@ -628,6 +789,26 @@ class Woozoho_Connector_Zoho_Client {
 		} else {
 			return null;
 		}
+	}
+
+	public function getTax( $tax_percentage, $tax_name = false, $useCaching = true, $checkCaching = false ) {
+		if ( $useCaching && ( $checkCaching ? $this->getCache()->checkItemsCache() : true ) && $this->getCache()->isEnabled() ) { //Check if caching is enabled & valid
+			Woozoho_Connector_Logger::writeDebug( "Get Tax", "Data 1: " . $tax_percentage . $tax_name );
+			$item = $this->cache->getTax( $tax_percentage, $tax_name );
+			if ( $item ) {
+				return $item;
+			}
+		} else { //Caching not enabled or valid
+			if ( ! $this->cache->checkItemsCache() && $this->cache->isEnabled() ) { //Caching not filled or not valid anymore
+				$this->cache->scheduleCaching();
+			}
+		}
+
+		return false;
+	}
+
+	public function print_taxes() {
+
 	}
 
 	/**
@@ -663,13 +844,27 @@ class Woozoho_Connector_Zoho_Client {
 	 * @return array
 	 */
 	public function itemConvert( $zohoItem, $storeItem, $quantity = 0 ) {
+		//Get right tax ID
+		Woozoho_Connector_Logger::writeDebug( "Tax Fix?", "Class: " . $storeItem->get_tax_class() );
+		Woozoho_Connector_Logger::writeDebug( "Tax class output", print_r( $storeItem->get_tax_class(), true ) );
+		Woozoho_Connector_Logger::writeDebug( "Taxes output", print_r( $storeItem->get_taxes(), true ) );
+		$tax = $this->getTax( $zohoItem->tax_percentage );
+
+		if ( $tax ) {
+			Woozoho_Connector_Logger::writeDebug( "Tax Fix?", "Tax found in cache by percentage." );
+			$tax_id = $tax->tax_id;
+		} else {
+			$tax_id = $zohoItem->tax_id;
+			Woozoho_Connector_Logger::writeDebug( "Tax Fix?", "Tax not found, using original: " . $tax_id );
+		}
+
 		$convertedItem = array(
 			"item_id"     => $zohoItem->item_id,
 			"rate"        => ( Woozoho_Connector::get_option( "pricing" ) == "zoho" || ! $storeItem ) ?
 				$zohoItem->rate : $storeItem->get_total(),
 			"name"        => $zohoItem->name,
 			"description" => $zohoItem->description,
-			"tax_id"      => $zohoItem->tax_id,
+			"tax_id"      => 200451000001689003,
 			"unit"        => $zohoItem->unit,
 			"quantity"    => ( $quantity != 0 || ! $storeItem ) ?
 				$quantity : $storeItem->get_quantity()
@@ -699,6 +894,17 @@ class Woozoho_Connector_Zoho_Client {
 		}
 
 		Woozoho_Connector_Logger::writeDebug( "Price Sync", "Scheduled price sync." );
+	}
+
+	public function schedule_sku_checker( $timestamp = false ) {
+		if ( $timestamp !== false ) {
+			wp_schedule_single_event( $timestamp, 'woozoho_sku_checker' );
+		} else {
+			wp_schedule_single_event( time(), 'woozoho_sku_checker' );
+		}
+
+		Woozoho_Connector_Logger::writeDebug( "SKU Checker", "Scheduled SKU checker." );
+
 	}
 
 	/**

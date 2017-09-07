@@ -88,5 +88,6 @@ class Woozoho_Connector_Cronjobs {
 
 	public function startCaching() {
 		Woozoho_Connector()->client->getCache()->cacheItems();
+		Woozoho_Connector()->client->getCache()->cacheTaxes();
 	}
 }

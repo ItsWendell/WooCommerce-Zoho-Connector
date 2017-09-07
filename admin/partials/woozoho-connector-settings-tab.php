@@ -22,18 +22,35 @@ if ( ! empty( $_REQUEST["action"] ) ) {
 			Woozoho_Connector()->client->getCache()->scheduleCaching();
 			WC_Admin_Settings::add_message( "We're renewing the cache in the background, you can continue with your activities." );
 			WC_Admin_Settings::show_messages();
+			break;
 		}
 
 		case "process_orders_queue": {
 			Woozoho_Connector()->cron_jobs->setupOrdersJob();
 			WC_Admin_Settings::add_message( "We're processing the orders queue in the background, you can continue with your activities." );
 			WC_Admin_Settings::show_messages();
+			break;
 		}
 
 		case "sync_prices": {
 			WC_Admin_Settings::add_message( "We're syncing the prices in the background, you can continue with your activities." );
 			WC_Admin_Settings::show_messages();
 			Woozoho_Connector()->client->schedule_sync_prices();
+			break;
+		}
+
+		case "sku_checker": {
+			WC_Admin_Settings::add_message( "We're checking SKU's in the background, you can continue with your activities." );
+			WC_Admin_Settings::show_messages();
+			Woozoho_Connector()->client->schedule_sku_checker();
+			break;
+		}
+
+		case "print_taxes": {
+			WC_Admin_Settings::add_message( "We're printing the taxes in de debug log." );
+			WC_Admin_Settings::show_messages();
+			Woozoho_Connector()->client->print_taxes();
+			break;
 		}
 	}
 }
@@ -41,6 +58,7 @@ if ( ! empty( $_REQUEST["action"] ) ) {
 echo "<a class='page-title-action' href='" . Woozoho_Connector_Admin::get_action_url( 'renew_items_cache' ) . "'>Renew Items Cache</a>";
 echo "<a class='page-title-action' href='" . Woozoho_Connector_Admin::get_action_url( 'process_orders_queue' ) . "'>Process Orders Queue</a>";
 echo "<a class='page-title-action' href='" . Woozoho_Connector_Admin::get_action_url( 'sync_prices' ) . "'>Sync Prices</a>";
+echo "<a class='page-title-action' href='" . Woozoho_Connector_Admin::get_action_url( 'sku_checker' ) . "'>SKU Checker</a>";
 
 
 woocommerce_admin_fields( self::get_settings() );
