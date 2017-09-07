@@ -792,8 +792,11 @@ class Woozoho_Connector_Zoho_Client {
 	}
 
 	public function getTax( $tax_percentage, $tax_name = false, $useCaching = true, $checkCaching = false ) {
+		$tax_percentage = (int) $tax_percentage;
+		Woozoho_Connector_Logger::writeDebug( "Get Tax", "Input data: Percentage: " . $tax_percentage . " Tax Name: " . $tax_name );
 		if ( $useCaching && ( $checkCaching ? $this->getCache()->checkItemsCache() : true ) && $this->getCache()->isEnabled() ) { //Check if caching is enabled & valid
-			Woozoho_Connector_Logger::writeDebug( "Get Tax", "Data 1: " . $tax_percentage . $tax_name );
+
+			Woozoho_Connector_Logger::writeDebug( "Get Tax", "Data 1: Percentage: " . $tax_percentage . " Name" . $tax_name );
 			$item = $this->cache->getTax( $tax_percentage, $tax_name );
 			if ( $item ) {
 				return $item;
