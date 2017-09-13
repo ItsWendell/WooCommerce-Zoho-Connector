@@ -244,8 +244,8 @@ class Woozoho_Connector_Admin {
 			array(
 				'name'    => __( 'Reference Number Format', 'woozoho-connector' ),
 				'type'    => 'text',
-				'default' => ( is_multisite() == true ) ? 'WP-%post_id%-%blog_id%' : 'WP-%post_id%',
-				'desc'    => __( '%post_id% = WooCommerce Order ID & %blog_id% = multisite blog id', 'woozoho-connector' ),
+				'default' => ( is_multisite() == true ) ? 'WP-%order_number%' : 'WP-%post_id%',
+				'desc'    => __( '%post_id% = WooCommerce Order Post ID & %blog_id% = multisite blog id, %order_number% for actual order number', 'woozoho-connector' ),
 				'id'      => 'wc_zoho_connector_reference_number_format'
 			),
 

@@ -113,11 +113,16 @@ class Woozoho_Connector_Zoho_Client {
 	}
 
 	public function getReferenceNumber( $order_id ) {
+		$order = new WC_Order( $order_id );
+
+		$order_number = trim( str_replace( '#', '', $order->get_order_number() ) );
+
 		$rawString = Woozoho_Connector::get_option( "reference_number_format" );
 
 		$refVars = array(
-			'post_id' => $order_id,
-			'blog_id' => get_current_blog_id()
+			'post_id'      => $order_id,
+			'order_number' => $order_number,
+			'blog_id'      => get_current_blog_id()
 		);
 
 		$result = preg_replace_callback(
@@ -156,6 +161,7 @@ class Woozoho_Connector_Zoho_Client {
 			"description"  => $item->get_product()->get_description(),
 			"sku"          => $item->get_product()->get_sku(),
 			"tax_id"       => 200451000001689003,
+			//TODO: Handle BTW.
 			"product_type" => "goods"
 		];
 
