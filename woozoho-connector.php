@@ -28,7 +28,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 final class Woozoho_Connector {
 
 	protected static $_instance = null;
-	public $version = "0.6";
+	public $version = "0.8";
 	/**
 	 * @var Woozoho_Connector_Zoho_Client
 	 */
@@ -46,7 +46,7 @@ final class Woozoho_Connector {
 	public function __construct() {
 		require_once dirname( __FILE__ ) . '/includes/class-woozoho-connector-logger.php';
 		if ( ! $this->check_dependencies() ) {
-			Woozoho_Connector_Logger::writeDebug( "Plugin", "Dependencies not met!" );
+			Woozoho_Connector_Logger::write_debug( "Plugin", "Dependencies not met!" );
 			wp_die( "WooZoho connector needs WooCommerce installed." );
 
 			return;
@@ -127,7 +127,7 @@ final class Woozoho_Connector {
 		$this->cron_jobs = new Woozoho_Connector_Cronjobs();
 
 		$this->plugin_hooks();
-		$this->int_cron_jobs();
+		$this->intitialize_cron_jobs();
 
 		$this->run();
 	}
@@ -163,29 +163,29 @@ final class Woozoho_Connector {
 		$this->loader->add_filter( 'handle_bulk_actions-edit-shop_order', $plugin_admin, 'woocommerce_bulk_action_send_zoho', 10, 3 );
 
 		//WooCommerce Prepare New Order for Push to Zoho
-		$this->loader->add_action( 'woocommerce_new_order', $plugin_admin, 'scheduleOrder', 20, 1 );
+		$this->loader->add_action( 'woocommerce_new_order', $plugin_admin, 'schedule_order', 20, 1 );
 
 
 		//Notices
 		$this->loader->add_action( 'admin_notices', $plugin_admin, 'woocommerce_zoho_connector_admin_notices' );
 
 
-		$this->loader->add_action( 'woozoho_push_order_queue', $plugin_admin, 'pushOrder', 10, 1 );
+		$this->loader->add_action( 'woozoho_push_order_queue', $plugin_admin, 'create_sales_order', 10, 1 );
 		$this->loader->add_action( 'woozoho_sync_prices', $plugin_admin, 'sync_prices' );
 		$this->loader->add_action( 'woozoho_sku_checker', $plugin_admin, 'sku_checker' );
 	}
 
-	private function int_cron_jobs() {
+	private function intitialize_cron_jobs() {
 		$isEnabled = Woozoho_Connector::get_option( "cron_orders_enabled" );
 		if ( $isEnabled ) {
-			if ( ! $this->cron_jobs->isOrdersJobRunning() ) {
-				$this->cron_jobs->setupOrdersJob();
+			if ( ! $this->cron_jobs->is_orders_job_running() ) {
+				$this->cron_jobs->setup_orders_job();
 			}
-			$this->loader->add_action( 'woozoho_orders_job', $this->cron_jobs, 'runOrdersJob' );
-		} else if ( ! $isEnabled && $this->cron_jobs->isOrdersJobRunning() ) {
-			$this->cron_jobs->stopOrdersJob();
+			$this->loader->add_action( 'woozoho_orders_job', $this->cron_jobs, 'run_orders_job' );
+		} else if ( ! $isEnabled && $this->cron_jobs->is_orders_job_running() ) {
+			$this->cron_jobs->stop_orders_job();
 		}
-		$this->loader->add_action( 'woozoho_caching', $this->cron_jobs, 'startCaching' );
+		$this->loader->add_action( 'woozoho_caching', $this->cron_jobs, 'start_caching' );
 	}
 
 	public function load_plugin_textdomain() {

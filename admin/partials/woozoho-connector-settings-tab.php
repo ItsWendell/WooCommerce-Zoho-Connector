@@ -18,15 +18,15 @@
 if ( ! empty( $_REQUEST["action"] ) ) {
 	switch ( $_REQUEST["action"] ) {
 		case "renew_items_cache": {
-			Woozoho_Connector_Logger::writeDebug( "Settings Action", "Regenerating caches..." );
-			Woozoho_Connector()->client->getCache()->scheduleCaching();
+			Woozoho_Connector_Logger::write_debug( "Settings Action", "Regenerating caches..." );
+			Woozoho_Connector()->client->get_cache()->scheduleCaching();
 			WC_Admin_Settings::add_message( "We're renewing the cache in the background, you can continue with your activities." );
 			WC_Admin_Settings::show_messages();
 			break;
 		}
 
 		case "process_orders_queue": {
-			Woozoho_Connector()->cron_jobs->setupOrdersJob();
+			Woozoho_Connector()->cron_jobs->setup_orders_job();
 			WC_Admin_Settings::add_message( "We're processing the orders queue in the background, you can continue with your activities." );
 			WC_Admin_Settings::show_messages();
 			break;

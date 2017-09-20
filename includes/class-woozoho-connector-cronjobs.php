@@ -29,65 +29,65 @@ class Woozoho_Connector_Cronjobs {
 		//Define jobs
 	}
 
-	public function updateOrdersJob( $recurrence ) {
+	public function update_orders_job( $recurrence ) {
 		$isEnabled = Woozoho_Connector::get_option( "cron_orders_enabled" );
 		if ( $isEnabled ) {
 			$oldRecurrence = wp_get_schedule( 'woozoho_orders_job' );
 			if ( $recurrence != $oldRecurrence ) {
-				Woozoho_Connector_Logger::writeDebug( "Cron Jobs", "Changing cronjob from " . $oldRecurrence . " to " . $recurrence );
+				Woozoho_Connector_Logger::write_debug( "Cron Jobs", "Changing cronjob from " . $oldRecurrence . " to " . $recurrence );
 				$nextTime = wp_next_scheduled( 'woozoho_orders_job' );
 				wp_unschedule_event( $nextTime, 'woozoho_orders_job' );
-				if ( ! $this->isOrdersJobRunning() ) {
-					$this->setupOrdersJob();
+				if ( ! $this->is_orders_job_running() ) {
+					$this->setup_orders_job();
 				} else {
-					Woozoho_Connector_Logger::writeDebug( "Cron Jobs", "Error, job was still running! Cant change " . $oldRecurrence . " to " . $recurrence );
+					Woozoho_Connector_Logger::write_debug( "Cron Jobs", "Error, job was still running! Cant change " . $oldRecurrence . " to " . $recurrence );
 				}
 			}
 		} else {
-			$this->stopOrdersJob();
+			$this->stop_orders_job();
 		}
 	}
 
-	public function isOrdersJobRunning() {
+	public function is_orders_job_running() {
 		return wp_next_scheduled( 'woozoho_orders_job' );
 	}
 
-	public function setupOrdersJob() {
+	public function setup_orders_job() {
 		$recurrence = Woozoho_Connector::get_option( "cron_orders_recurrence" );
 		if ( $recurrence == "directly" ) {
 			$recurrence = "hourly";
 		}
-		Woozoho_Connector_Logger::writeDebug( "Cron Jobs", "Setting up cron job for Orders on a " . $recurrence . " basis..." );
+		Woozoho_Connector_Logger::write_debug( "Cron Jobs", "Setting up cron job for Orders on a " . $recurrence . " basis..." );
 		wp_schedule_event( time(), $recurrence, 'woozoho_orders_job' );
-		Woozoho_Connector_Logger::writeDebug( "Cron Jobs", "Cron job is successfully setup." );
+		Woozoho_Connector_Logger::write_debug( "Cron Jobs", "Cron job is successfully setup." );
 	}
 
-	public function stopOrdersJob() {
-		Woozoho_Connector_Logger::writeDebug( "Cron Jobs", "Stopping 'woozoho_orders_job'." );
-		if ( $this->isOrdersJobRunning() ) {
+	public function stop_orders_job() {
+		Woozoho_Connector_Logger::write_debug( "Cron Jobs", "Stopping 'woozoho_orders_job'." );
+		if ( $this->is_orders_job_running() ) {
 			$nextTime = wp_next_scheduled( 'woozoho_orders_job' );
 			wp_unschedule_event( $nextTime, 'woozoho_orders_job' );
 		}
 	}
 
-	public function runOrdersJob() {
-		Woozoho_Connector_Logger::writeDebug( "Cron Jobs", "Running orders cron job..." );
-		$ordersQueue = Woozoho_Connector()->client->getOrdersQueue()->getQueue();
+	public function run_orders_job() {
+		Woozoho_Connector_Logger::write_debug( "Cron Jobs", "Running orders cron job..." );
+		$ordersQueue = Woozoho_Connector()->client->get_orders_queue()->getQueue();
 
 		if ( count( $ordersQueue ) >= 1 ) {
 			foreach ( $ordersQueue as $order_id ) {
-				Woozoho_Connector_Logger::writeDebug( "Cron Jobs", "Pushing Order ID: " . $order_id );
-				Woozoho_Connector()->client->pushOrder( $order_id );
+				Woozoho_Connector_Logger::write_debug( "Cron Jobs", "Pushing Order ID: " . $order_id );
+				Woozoho_Connector()->client->create_sales_order( $order_id );
 			}
 		} else {
-			if ( Woozoho_Connector()->client->getCache()->isEnabled() && ! defined( 'WOOZOHO_ITEMS_CACHING' ) ) {
-				Woozoho_Connector()->client->getCache()->checkItemsCache( true );
+			if ( Woozoho_Connector()->client->get_cache()->isEnabled() && ! defined( 'WOOZOHO_ITEMS_CACHING' ) ) {
+				Woozoho_Connector()->client->get_cache()->checkItemsCache( true );
 			}
 		}
 	}
 
-	public function startCaching() {
-		Woozoho_Connector()->client->getCache()->cacheItems();
-		Woozoho_Connector()->client->getCache()->cacheTaxes();
+	public function start_caching() {
+		Woozoho_Connector()->client->get_cache()->cacheItems();
+		Woozoho_Connector()->client->get_cache()->cacheTaxes();
 	}
 }

@@ -21,9 +21,8 @@ class Woozoho_Connector_Zoho_API {
 
 	public $organizationId;
 	public $accessToken;
-	public $returnAsJson = true;
-	private $_baseUrl = 'books.zoho.com/api/v3';
-	private $_curlObject;
+	private $base_url = 'books.zoho.com/api/v3';
+	private $curl_object;
 
 	//TODO: Add support of counting API calls on daily basis.
 	//TODO: Before doing API calls figure out how many calls are required (maximum) and see if that fits within the limits of today, if not move the job to tomorrow.
@@ -53,27 +52,27 @@ class Woozoho_Connector_Zoho_API {
 	}
 
 	private function curlRequest( $alias, $method = 'GET', array $params = [], array $urlParams = [] ) {
-		$this->_curlObject = $this->initializeCurlObject();
+		$this->curl_object = $this->initializeCurlObject();
 		if ( $method == 'POST' ) {
-			curl_setopt( $this->_curlObject, CURLOPT_POST, true );
+			curl_setopt( $this->curl_object, CURLOPT_POST, true );
 		} else {
-			curl_setopt( $this->_curlObject, CURLOPT_CUSTOMREQUEST, $method );
+			curl_setopt( $this->curl_object, CURLOPT_CUSTOMREQUEST, $method );
 		}
 		if ( $method == 'GET' ) {
-			curl_setopt( $this->_curlObject, CURLOPT_URL, $this->getUrlPath( $alias, $params ) );
+			curl_setopt( $this->curl_object, CURLOPT_URL, $this->getUrlPath( $alias, $params ) );
 		} else {
-			curl_setopt( $this->_curlObject, CURLOPT_URL, $this->getUrlPath( $alias, $urlParams ) );
-			curl_setopt( $this->_curlObject, CURLOPT_POSTFIELDS, $params );
+			curl_setopt( $this->curl_object, CURLOPT_URL, $this->getUrlPath( $alias, $urlParams ) );
+			curl_setopt( $this->curl_object, CURLOPT_POSTFIELDS, $params );
 		}
 
 
 		//MORE CRAP
-		curl_setopt( $this->_curlObject, CURLOPT_AUTOREFERER, true );
-		curl_setopt( $this->_curlObject, CURLOPT_SSL_VERIFYPEER, false );
-		curl_setopt( $this->_curlObject, CURLOPT_SSL_VERIFYHOST, false );
-		curl_setopt( $this->_curlObject, CURLOPT_VERBOSE, 1 );
+		curl_setopt( $this->curl_object, CURLOPT_AUTOREFERER, true );
+		curl_setopt( $this->curl_object, CURLOPT_SSL_VERIFYPEER, false );
+		curl_setopt( $this->curl_object, CURLOPT_SSL_VERIFYHOST, false );
+		curl_setopt( $this->curl_object, CURLOPT_VERBOSE, 1 );
 		$fp = fopen( dirname( __FILE__ ) . '/errorlog.txt', 'w' );
-		curl_setopt( $this->_curlObject, CURLOPT_STDERR, $fp );
+		curl_setopt( $this->curl_object, CURLOPT_STDERR, $fp );
 
 		return $this->execute();
 	}
@@ -81,14 +80,14 @@ class Woozoho_Connector_Zoho_API {
 	//************************************** Item *********************************************
 
 	private function initializeCurlObject() {
-		$this->_curlObject = curl_init( '' );
-		curl_setopt( $this->_curlObject, CURLOPT_RETURNTRANSFER, 1 );
+		$this->curl_object = curl_init( '' );
+		curl_setopt( $this->curl_object, CURLOPT_RETURNTRANSFER, 1 );
 
-		return $this->_curlObject;
+		return $this->curl_object;
 	}
 
 	private function getUrlPath( $alias, $params = [] ) {
-		return 'https://' . preg_replace( '/\/+/', '/', "{$this->_baseUrl}/{$alias}" ) . '?'
+		return 'https://' . preg_replace( '/\/+/', '/', "{$this->base_url}/{$alias}" ) . '?'
 		       . http_build_query( array_merge( $this->getAuthParams(), $params ?: [] ) );
 	}
 
@@ -101,13 +100,13 @@ class Woozoho_Connector_Zoho_API {
 	}
 
 	private function execute() {
-		$return = curl_exec( $this->_curlObject );
-		if ( curl_errno( $this->_curlObject ) ) {
-			$errorNo   = curl_errno( $this->_curlObject );
-			$errorText = curl_error( $this->_curlObject );
+		$return = curl_exec( $this->curl_object );
+		if ( curl_errno( $this->curl_object ) ) {
+			$errorNo   = curl_errno( $this->curl_object );
+			$errorText = curl_error( $this->curl_object );
 			throw new \Exception( "cUrl Error ({$errorNo}) : {$errorText}." );
 		}
-		curl_close( $this->_curlObject );
+		curl_close( $this->curl_object );
 		$return = json_decode( $return );
 		if ( $return->code == 0 ) {
 			return $return;
@@ -493,7 +492,7 @@ class Woozoho_Connector_Zoho_API {
 	 * @return \stdClass
 	 * @see https://www.zoho.com/inventory/api/v1/#mark-as-void68
 	 */
-	public function voidSalesOrder( $salesorder_id ) {
+	public function set_sales_order_void( $salesorder_id ) {
 		return $this->curlRequest( "/salesorders/{$salesorder_id}/status/void", 'POST' );
 	}
 
@@ -503,7 +502,7 @@ class Woozoho_Connector_Zoho_API {
 	 * @return \stdClass
 	 * @see https://www.zoho.com/inventory/api/v1/#create-a-contact
 	 */
-	public function createContact( array $params = [] ) {
+	public function create_contact( array $params = [] ) {
 		return $this->curlRequest( "/contacts", 'POST', [ 'JSONString' => json_encode( $params ) ] );
 	}
 
@@ -514,7 +513,7 @@ class Woozoho_Connector_Zoho_API {
 	 * @return \stdClass
 	 * @see https://www.zoho.com/inventory/api/v1/#update-an-contact
 	 */
-	public function updateContact( $contact_id, array $params = [] ) {
+	public function update_contact( $contact_id, array $params = [] ) {
 		return $this->curlRequest( "/contacts/{$contact_id}", 'PUT', [ 'JSONString' => json_encode( $params ) ] );
 	}
 
@@ -525,7 +524,7 @@ class Woozoho_Connector_Zoho_API {
 	 * @return \stdClass
 	 * @see https://www.zoho.com/inventory/api/v1/#retrieve-a-contact
 	 */
-	public function retrieveContact( $contact_id = null, array $filters = [] ) {
+	public function get_contact( $contact_id = null, array $filters = [] ) {
 		return $this->curlRequest( "/contacts/{$contact_id}", 'GET', $filters );
 	}
 
@@ -538,7 +537,7 @@ class Woozoho_Connector_Zoho_API {
 	 * @return \stdClass
 	 * @see https://www.zoho.com/inventory/api/v1/#list-all-contact
 	 */
-	public function listContacts( array $filters = [] ) {
+	public function list_contacts( array $filters = [] ) {
 		return $this->curlRequest( "/contacts", 'GET', $filters );
 	}
 
@@ -550,7 +549,7 @@ class Woozoho_Connector_Zoho_API {
 	 * @return \stdClass
 	 * @see https://www.zoho.com/inventory/api/v1/#delete-an-contact
 	 */
-	public function deleteContact( $contact_id ) {
+	public function delete_contact( $contact_id ) {
 		return $this->curlRequest( "/contacts/{$contact_id}", 'DELETE' );
 	}
 
@@ -560,7 +559,7 @@ class Woozoho_Connector_Zoho_API {
 	 * @return \stdClass
 	 * @see https://www.zoho.com/inventory/api/v1/#mark-as-active
 	 */
-	public function activeContact( $contact_id ) {
+	public function set_contact_active( $contact_id ) {
 		return $this->curlRequest( "/contacts/{$contact_id}/active", 'POST' );
 	}
 
@@ -570,7 +569,7 @@ class Woozoho_Connector_Zoho_API {
 	 * @return \stdClass
 	 * @see https://www.zoho.com/inventory/api/v1/#mark-as-inactive
 	 */
-	public function inactiveContact( $contact_id ) {
+	public function set_contact_inactive( $contact_id ) {
 		return $this->curlRequest( "/contacts/{$contact_id}/inactive", 'POST' );
 	}
 

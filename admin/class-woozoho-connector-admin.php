@@ -53,10 +53,10 @@ class Woozoho_Connector_Admin {
 
 	public static function woocommerce_update_settings() {
 		$oldOrderRecurrence = Woozoho_Connector::get_option( "cron_orders_recurrence" );
-		Woozoho_Connector_Logger::writeDebug( "Settings", "Settings updated!" );
+		Woozoho_Connector_Logger::write_debug( "Settings", "Settings updated!" );
 		woocommerce_update_options( self::get_settings() );
 		if ( $oldOrderRecurrence != Woozoho_Connector::get_option( "cron_orders_recurrence" ) ) {
-			Woozoho_Connector()->cron_jobs->updateOrdersJob( Woozoho_Connector::get_option( "cron_orders_recurrence" ) );
+			Woozoho_Connector()->cron_jobs->update_orders_job( Woozoho_Connector::get_option( "cron_orders_recurrence" ) );
 		}
 	}
 
@@ -79,7 +79,7 @@ class Woozoho_Connector_Admin {
 			array(
 				'name' => __( 'Auth Token', 'woozoho-connector' ),
 				'type' => 'text',
-				'desc' => __( 'Generate a auth code here.', 'woozoho-connector' ),
+				'desc' => __( '<a href="https://accounts.zoho.com/apiauthtoken/create?SCOPE=ZohoBooks/booksapi">Click here to generate an auth code.</a>', 'woozoho-connector' ),
 				'id'   => 'wc_zoho_connector_token'
 			),
 
@@ -374,7 +374,7 @@ class Woozoho_Connector_Admin {
 		}
 
 		foreach ( $post_ids as $post_id ) {
-			Woozoho_Connector()->client->scheduleOrder( $post_id, false );
+			Woozoho_Connector()->client->schedule_order( $post_id, false );
 		}
 
 		$redirect_to = add_query_arg( 'bulk_send_zoho', count( $post_ids ), $redirect_to );
@@ -395,8 +395,8 @@ class Woozoho_Connector_Admin {
 		}
 	}
 
-	public function pushOrder( $order_id ) {
-		Woozoho_Connector()->client->pushOrder( $order_id );
+	public function create_sales_order( $order_id ) {
+		Woozoho_Connector()->client->create_sales_order( $order_id );
 	}
 
 	public function sync_prices() {
@@ -411,27 +411,17 @@ class Woozoho_Connector_Admin {
 		include_once WOOZOHO_ABSPATH . 'admin/partials/woozoho-connector-settings-tab.php';
 	}
 
-	public function doAction( $action ) {
-		switch ( $action ) {
-			case "clearcache": {
-				WC_Admin_Notices::add_custom_notice( 'woozoho_clear_cache_notice', "Clearing Zoho Connector cache in the background..." );
-				Woozoho_Connector_Logger::writeDebug( "Action", "Regenerating caches..." );
-				Woozoho_Connector()->client->getCache()->scheduleCaching();
-			}
-		}
-	}
-
-	public function scheduleOrder( $order_id ) {
+	public function schedule_order( $order_id ) {
 		$hook = current_action();
 
 		if ( $hook == "woocommerce_new_order" ) {
-			Woozoho_Connector_Logger::writeDebug( "WooCommerce", "A new order ($order_id) received." );
+			Woozoho_Connector_Logger::write_debug( "WooCommerce", "A new order ($order_id) received." );
 		}
 
 		if ( Woozoho_Connector::get_option( "cron_orders_recurrence" ) == "directly" ) {
-			Woozoho_Connector()->client->scheduleOrder( $order_id );
+			Woozoho_Connector()->client->schedule_order( $order_id );
 		} else {
-			Woozoho_Connector()->client->getOrdersQueue()->addOrder( $order_id );
+			Woozoho_Connector()->client->get_orders_queue()->addOrder( $order_id );
 		}
 	}
 }

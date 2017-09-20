@@ -42,10 +42,10 @@ class Woozoho_Connector_Activator {
 		//TODO: Implement database update scripts (e.x. WooCommerce)
 
 		$table_name = $wpdb->prefix . 'woozoho_orders_tracker';
-		Woozoho_Connector_Logger::writeDebug( "Install DB", "Activating plugin in " . $table_name );
+		Woozoho_Connector_Logger::write_debug( "Install DB", "Activating plugin in " . $table_name );
 
 		if ( $wpdb->get_var( "SHOW TABLES LIKE '$table_name'" ) != $table_name ) {
-			Woozoho_Connector_Logger::writeDebug( "Install DB", "Table doesn't exist, creating table " . $table_name );
+			Woozoho_Connector_Logger::write_debug( "Install DB", "Table doesn't exist, creating table " . $table_name );
 
 			$sql = "CREATE TABLE $table_name (
   			ID bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -61,10 +61,10 @@ class Woozoho_Connector_Activator {
 
 			require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
 			$resultData = dbDelta( $sql );
-			Woozoho_Connector_Logger::writeDebug( "Install DB", $resultData );
+			Woozoho_Connector_Logger::write_debug( "Install DB", $resultData );
 
 		} else {
-			Woozoho_Connector_Logger::writeDebug( "Install DB", "Table already installed. Moving on." );
+			Woozoho_Connector_Logger::write_debug( "Install DB", "Table already installed. Moving on." );
 		}
 	}
 }

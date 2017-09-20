@@ -48,7 +48,7 @@ class Woozoho_Connector_Zoho_Cache {
 	}
 
 	public function checkItemsCache( $make_valid = false ) {
-		Woozoho_Connector_Logger::writeDebug( "API Cache", "Checking if cache is valid." );
+		Woozoho_Connector_Logger::write_debug( "API Cache", "Checking if cache is valid." );
 		/** @noinspection PhpUndefinedConstantInspection */
 		$itemsFile = $this->cacheDir . "items.json";
 		$taxesFile = $this->cacheDir . "taxes.json";
@@ -60,11 +60,11 @@ class Woozoho_Connector_Zoho_Cache {
 			//Woozoho_Connector_Logger::writeDebug("API Cache","File time: $fileTime, Expire Time: $expireTime, Now Time: $nowTime, Expire Time should be bigger than now time for cache to be valid.");
 
 			if ( $expireTime >= $nowTime ) {
-				Woozoho_Connector_Logger::writeDebug( "API Cache", "Cache is still valid." );
+				Woozoho_Connector_Logger::write_debug( "API Cache", "Cache is still valid." );
 
 				return true;
 			} else {
-				Woozoho_Connector_Logger::writeDebug( "API Cache", "Cache is outdated, removing..." );
+				Woozoho_Connector_Logger::write_debug( "API Cache", "Cache is outdated, removing..." );
 				unlink( $itemsFile ); //Removing expired cache.
 				unlink( $taxesFile );
 				if ( $make_valid ) {
@@ -76,7 +76,7 @@ class Woozoho_Connector_Zoho_Cache {
 				return false;
 			}
 		} else {
-			Woozoho_Connector_Logger::writeDebug( "API Cache", "No cache file is available." );
+			Woozoho_Connector_Logger::write_debug( "API Cache", "No cache file is available." );
 			if ( $make_valid ) {
 				if ( $this->cacheItems() && $this->cacheTaxes() ) {
 					return true;
@@ -93,16 +93,17 @@ class Woozoho_Connector_Zoho_Cache {
 
 		if ( ! empty( $taxes ) ) {
 			if ( file_put_contents( $cacheFile, json_encode( $taxes ) ) ) {
-				Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Successfully wrote taxes to cache." );
+				Woozoho_Connector_Logger::write_debug( "Zoho Cache", "Successfully wrote taxes to cache." );
 				$this->taxes_cache = $taxes;
 
 				return true;
 			} else {
-				Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Error something went wrong with writing to taxes cache, check file permissions!" );
+				Woozoho_Connector_Logger::write_debug( "Zoho Cache", "Error something went wrong with writing to taxes cache, check file permissions!" );
 
 				return false;
 			}
 		} else {
+			Woozoho_Connector_Logger::write_debug( "Zoho Cache", "Error, taxes are empty!" );
 			unlink( $cacheFile );
 
 			return false;
@@ -111,14 +112,14 @@ class Woozoho_Connector_Zoho_Cache {
 
 	public function cacheItems() {
 		if ( defined( 'WOOZOHO_ITEMS_CACHING' ) ) {
-			Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Already an item caching instance running, skipping..." );
+			Woozoho_Connector_Logger::write_debug( "Zoho Cache", "Already an item caching instance running, skipping..." );
 
 			return false;
 		}
 
 		define( 'WOOZOHO_ITEMS_CACHING', true );
 
-		Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Listing all cached items..." );
+		Woozoho_Connector_Logger::write_debug( "Zoho Cache", "Listing all cached items..." );
 		$cacheFile = $this->cacheDir . "items.json";
 
 		if ( ! is_dir( $this->cacheDir ) ) {
@@ -126,15 +127,15 @@ class Woozoho_Connector_Zoho_Cache {
 		}
 
 		//Get all items
-		$itemsCache = Woozoho_Connector()->client->getAllItems();
+		$itemsCache = Woozoho_Connector()->client->list_all_items();
 
 		if ( ! empty( $itemsCache ) ) {
 			if ( file_put_contents( $cacheFile, json_encode( $itemsCache ) ) ) {
-				Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Successfully wrote items to cache." );
+				Woozoho_Connector_Logger::write_debug( "Zoho Cache", "Successfully wrote items to cache." );
 				$this->items_cache = $itemsCache;
 				return true;
 			} else {
-				Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Error something went wrong with writing to items cache, check file permissions!" );
+				Woozoho_Connector_Logger::write_debug( "Zoho Cache", "Error something went wrong with writing to items cache, check file permissions!" );
 				return false;
 			}
 		} else {

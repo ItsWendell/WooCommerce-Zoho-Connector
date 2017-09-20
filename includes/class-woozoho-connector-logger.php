@@ -2,7 +2,7 @@
 
 class Woozoho_Connector_Logger {
 
-	public static function writeDebug( $type, $data ) {
+	public static function write_debug( $type, $data ) {
 		if ( Woozoho_Connector::get_option( "debugging" ) ) {
 			$multisite = is_multisite() ? "[" . get_bloginfo( 'name' ) . "]" : ( "" ); //Multi-site support.
 			$logfile   = realpath( __DIR__ . '/..' ) . '/debug_log';
