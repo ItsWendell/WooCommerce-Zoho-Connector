@@ -26,11 +26,11 @@ class Woozoho_Connector_Deactivator {
 	 * Short Description. (use period)
 	 *
 	 * Long Description.
-	 *
+	 * @var true|false
 	 * @since    1.0.0
 	 */
-	public static function deactivate() {
-		//TODO: Remove database on deactivation
+	public static function deactivate( $dependencies_not_met ) {
+		//TODO: Remove database on deactivation?
 	}
 
 }

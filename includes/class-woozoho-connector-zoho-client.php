@@ -16,10 +16,22 @@
  */
 class Woozoho_Connector_Zoho_Client {
 
+	/**
+	 * @var Woozoho_Connector_Orders_Queue
+	 */
 	protected $orders_queue;
+	/**
+	 * @var Woozoho_Connector_Zoho_Cache
+	 */
 	protected $cache;
+	/**
+	 * @var Woozoho_Connector_Zoho_API
+	 */
 	protected $zoho_api;
 
+	/**
+	 * Woozoho_Connector_Zoho_Client constructor.
+	 */
 	public function __construct() {
 		//API Settings
 		$args                   = array();
@@ -46,36 +58,42 @@ class Woozoho_Connector_Zoho_Client {
 		return $this->zoho_api;
 	}
 
+	/**
+	 * @return array
+	 */
 	public function list_all_items() {
-		$returnData = array();
-		$next_page  = 1;
+		$item_list = array();
+		$next_page = 1;
 
 		while ( $next_page ) {
 			Woozoho_Connector_Logger::write_debug( "Zoho Client", "Getting all items... current page: " . $next_page );
 			$args         = array();
 			$args["page"] = $next_page;
 
-			$resultData = $this->zoho_api->listItems( $args );
+			$items_on_page = $this->zoho_api->listItems( $args );
 			//TODO: Catch API return errors, retry certain times.
-			$hasNextPage = $resultData->page_context->has_more_page;
-			if ( $resultData->items ) {
-				foreach ( $resultData->items as $item ) {
-					$returnData[] = $item;
+			$has_next_page = $items_on_page->page_context->has_more_page;
+			if ( $items_on_page->items ) {
+				foreach ( $items_on_page->items as $item ) {
+					$item_list[] = $item;
 				}
 			}
 
-			Woozoho_Connector_Logger::write_debug( "Zoho Client", "Current item count " . count( $returnData ) );
+			Woozoho_Connector_Logger::write_debug( "Zoho Client", "Current item count " . count( $item_list ) );
 
-			if ( $hasNextPage ) {
+			if ( $has_next_page ) {
 				$next_page ++;
 			} else {
 				break;
 			}
 		}
 
-		return $returnData;
+		return $item_list;
 	}
 
+	/**
+	 * @return bool
+	 */
 	public function get_taxes() {
 		Woozoho_Connector_Logger::write_debug( "Zoho Client", "Getting Taxes..." );
 		$api_result = $this->zoho_api->listTaxes();
@@ -86,27 +104,32 @@ class Woozoho_Connector_Zoho_Client {
 		return false;
 	}
 
+	/**
+	 * @param $subject
+	 * @param $message
+	 */
 	public function send_notification_email( $subject, $message ) {
-		$mailTo = Woozoho_Connector::get_option( "notify_email" );
-		if ( $mailTo ) {
+		$mail_to = Woozoho_Connector::get_option( "notify_email" );
+		if ( $mail_to ) {
 			if ( ! is_multisite() ) {
 				$headers[] = 'From: Zoho Connector <' . get_option( 'admin_email' ) . '>';
 			} else {
 				$headers[] = 'From: Zoho Connector ' . get_bloginfo( 'name' ) . '<' . get_option( 'admin_email' ) . '>';
 			}
 			$headers[] = 'Content-Type: text/html; charset=UTF-8';
-			wp_mail( $mailTo, "WooCommerce Zoho Connector:" . $subject, $message, $headers );
-			Woozoho_Connector_Logger::write_debug( "Notification Email", "Email with subject '" . $subject . " sent to " . $mailTo );
+			wp_mail( $mail_to, "WooCommerce Zoho Connector:" . $subject, $message, $headers );
+			Woozoho_Connector_Logger::write_debug( "Notification Email", "Email with subject '" . $subject . " sent to " . $mail_to );
 		}
 	}
 
-	public function process_orders_queue() {
-		//TODO: remove? Function not being used?
-		$ordersData = $this->orders_queue->getQueue();
-		foreach ( $ordersData as $order_id ) {
-			$this->create_sales_order( $order_id );
-		}
-	}
+	/** REMOVED TEMP BECAUSE UNNECESSARY? Check HOOKS!
+	 * public function process_orders_queue() {
+	 * $queue = $this->orders_queue->getQueue();
+	 * foreach ( $queue as $order_id ) {
+	 * $this->create_sales_order( $order_id );
+	 * }
+	 * }
+	 */
 
 	public function generate_reference_number( $order_id ) {
 		$order = new WC_Order( $order_id );
@@ -135,51 +158,55 @@ class Woozoho_Connector_Zoho_Client {
 
 
 	/**
-	 * @param WC_Order_Item_Product $item
+	 * @param WC_Product $wc_product
 	 *
 	 * Required API calls: 2.
 	 *
 	 * @return bool|object
 	 */
-	public function create_item( $item ) {
+	public function create_item( $wc_product ) {
 		//TODO: Handle discounts, return proper order line item?
 		//TODO: Add support for Taxes (default tax setting or synchronisation of tax classes)
 
-		$product = $item->get_product();
-
-		if ( $product == null ) {
+		if ( $wc_product == null ) {
 			return false;
 		}
 
-		$pushData = [
-			"name"         => $product->get_name(),
-			"rate"         => $product->get_regular_price(),
-			"description"  => $item->get_product()->get_description(),
-			"sku"          => $item->get_product()->get_sku(),
-			"tax_id"       => 200451000001689003,
-			//TODO: Handle BTW.
+		$tax_rate = WC_Tax::get_rate_percent( $wc_product->get_tax_class() );
+		$input    = [
+			"name"         => $wc_product->get_name(),
+			"rate"         => $wc_product->get_regular_price(),
+			"description"  => $wc_product->get_description(),
+			"sku"          => $wc_product->get_sku(),
+			"tax_id"       => $this->get_tax($tax_rate),
 			"product_type" => "goods"
 		];
 
-		$apiResult = $this->zoho_api->createItem( $pushData );
+		$output = $this->zoho_api->createItem( $input );
 
-		if ( $apiResult->code === 0 ) {
-			Woozoho_Connector_Logger::write_debug( "Zoho Client", "Successfully created product in Zoho: " . $item->get_name() . " (" . $item->get_product()->get_sku() . ")" );
+		if ( $output->code === 0 ) {
+			Woozoho_Connector_Logger::write_debug( "Zoho Client", "Successfully created product in Zoho: " . $wc_product->get_name() . " (" . $wc_product->get_sku() . ")" );
 
-			return $apiResult->item;
+			return $output->item;
 		} else {
-			Woozoho_Connector_Logger::write_debug( "Zoho Client", "Something went wrong while creating product: " . $item->get_name() );
+			Woozoho_Connector_Logger::write_debug( "Zoho Client", "Something went wrong while creating product: " . $wc_product->get_name() );
 			return false;
 		}
 	}
 
+	/**
+	 * @param $shipping_cost
+	 * @param bool $shipping_tax
+	 *
+	 * @return array|bool
+	 */
 	public function get_shipping_lineitem( $shipping_cost, $shipping_tax = false ) {
 		$item_sku_option = Woozoho_Connector::get_option( "shipping_invoice_item_sku" );
 		$item_sku        = ! empty( $item_sku_option ) ? $item_sku_option : "SHIPPING-COST";
 		$item            = $this->get_item( $item_sku );
 
 		if ( ! $item ) {
-			$params = [
+			$input = [
 				"name"         => 'Shipping Costs',
 				"rate"         => '0',
 				"description"  => 'Item for shipping costs.',
@@ -188,11 +215,11 @@ class Woozoho_Connector_Zoho_Client {
 				"product_type" => "service"
 			];
 
-			$api_result = $this->zoho_api->createItem( $params );
+			$output = $this->zoho_api->createItem( $input );
 
-			if ( $api_result->code === 0 ) {
+			if ( $output->code === 0 ) {
 				Woozoho_Connector_Logger::write_debug( "Zoho Client", "Successfully created shipping costs product." );
-				$item = $api_result->item;
+				$item = $output->item;
 
 			} else {
 				Woozoho_Connector_Logger::write_debug( "Zoho Client", "Something went wrong while creating product for Shipping Costs (SHIPPING-COSTS)" );
@@ -227,6 +254,9 @@ class Woozoho_Connector_Zoho_Client {
 
 	//TODO: WARNING: Make sure your Tax names are the same in WooCommerce as in Zoho! DO NOT CHANGE YOUR TAX ITEMS IN ZOHO BOOKS. THIS MIGHT CAUSE CUNFUSION.
 
+	/**
+	 * @return bool
+	 */
 	public function tax_fixer() {
 		/*
 		if ( $this->cache->cacheItems() ) {
@@ -252,6 +282,9 @@ class Woozoho_Connector_Zoho_Client {
 		return false;
 	}
 
+	/**
+	 *
+	 */
 	public function sku_checker() {
 		$preference    = Woozoho_Connector::get_option( "pricing" );
 		$updated_items = 0;
@@ -305,6 +338,9 @@ class Woozoho_Connector_Zoho_Client {
 		}
 	}
 
+	/**
+	 *
+	 */
 	public function sync_prices() {
 		try {
 
@@ -459,8 +495,14 @@ class Woozoho_Connector_Zoho_Client {
 		return false;
 	}
 
+	/**
+	 * @param $item_id
+	 * @param $changes
+	 *
+	 * @return bool
+	 */
 	public function update_item( $item_id, $changes ) {
-		return $this->zoho_api->updateItem( $item_id, $changes );
+		return $this->zoho_api->updateItem( $item_id, $changes )->code === 0;
 	}
 
 	/**
@@ -549,7 +591,7 @@ class Woozoho_Connector_Zoho_Client {
 
 						if ( Woozoho_Connector::get_option( "create_items" ) == 'yes' ) { //We can create new items...
 
-							$zohoItem = $this->create_item( $line_item );
+							$zohoItem = $this->create_item( $line_item->get_product() );
 
 							if ( $zohoItem !== false ) {
 								$zoho_line_item = $this->convert_item( $zohoItem, $line_item );
@@ -681,6 +723,12 @@ class Woozoho_Connector_Zoho_Client {
 		}
 	}
 
+	/**
+	 * @param $contact_email
+	 * @param bool $company_name
+	 *
+	 * @return null
+	 */
 	public function get_contact( $contact_email, $company_name = false ) {
 		//TODO: Link contacts to users using meta field?
 		//TODO: Rewrite to input actual WooCommerce contact
@@ -811,6 +859,14 @@ class Woozoho_Connector_Zoho_Client {
 		}
 	}
 
+	/**
+	 * @param $tax_percentage
+	 * @param bool $tax_name
+	 * @param bool $useCaching
+	 * @param bool $checkCaching
+	 *
+	 * @return bool
+	 */
 	public function get_tax( $tax_percentage, $tax_name = false, $useCaching = true, $checkCaching = false ) {
 		$tax_percentage = (int) $tax_percentage;
 		Woozoho_Connector_Logger::write_debug( "Get Tax", "Input data: Percentage: " . $tax_percentage . " Tax Name: " . $tax_name );
@@ -880,7 +936,7 @@ class Woozoho_Connector_Zoho_Client {
 		$convertedItem = array(
 			"item_id"     => $zohoItem->item_id,
 			"rate"        => ( Woozoho_Connector::get_option( "pricing" ) == "zoho" || ! $storeItem ) ?
-				$zohoItem->rate : $storeItem->get_total(),
+				$zohoItem->rate : $storeItem->get_product()->get_regular_price(),
 			"name"        => $zohoItem->name,
 			"description" => $zohoItem->description,
 			"tax_id"      => 200451000001689003,
@@ -892,6 +948,10 @@ class Woozoho_Connector_Zoho_Client {
 		return $convertedItem;
 	}
 
+	/**
+	 * @param $post_id
+	 * @param bool $timestamp
+	 */
 	public function schedule_order( $post_id, $timestamp = false ) {
 
 		$this->orders_queue->addOrder( $post_id );
@@ -903,6 +963,9 @@ class Woozoho_Connector_Zoho_Client {
 		}
 	}
 
+	/**
+	 * @param bool $timestamp
+	 */
 	public function schedule_sync_prices( $timestamp = false ) {
 
 
@@ -915,6 +978,9 @@ class Woozoho_Connector_Zoho_Client {
 		Woozoho_Connector_Logger::write_debug( "Price Sync", "Scheduled price sync." );
 	}
 
+	/**
+	 * @param bool $timestamp
+	 */
 	public function schedule_sku_checker( $timestamp = false ) {
 		if ( $timestamp !== false ) {
 			wp_schedule_single_event( $timestamp, 'woozoho_sku_checker' );

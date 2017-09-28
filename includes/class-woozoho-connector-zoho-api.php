@@ -67,12 +67,19 @@ class Woozoho_Connector_Zoho_API {
 
 
 		//MORE CRAP
+		//Authorization: Zoho-authtoken ba4604e8e433g9c892e360d53463oec5
+		$auth_header = [
+			'Authorization: Zoho-authtoken ' . $this->accessToken
+		];
+
+
 		curl_setopt( $this->curl_object, CURLOPT_AUTOREFERER, true );
 		curl_setopt( $this->curl_object, CURLOPT_SSL_VERIFYPEER, false );
 		curl_setopt( $this->curl_object, CURLOPT_SSL_VERIFYHOST, false );
 		curl_setopt( $this->curl_object, CURLOPT_VERBOSE, 1 );
 		$fp = fopen( dirname( __FILE__ ) . '/errorlog.txt', 'w' );
 		curl_setopt( $this->curl_object, CURLOPT_STDERR, $fp );
+		curl_setopt( $this->curl_object, CURLOPT_HTTPHEADER, $auth_header );
 
 		return $this->execute();
 	}
@@ -96,7 +103,7 @@ class Woozoho_Connector_Zoho_API {
 	 * @return array
 	 */
 	public function getAuthParams() {
-		return array_merge( [ 'authtoken' => $this->accessToken, 'organization_id' => $this->organizationId ] );
+		return array_merge( [ 'organization_id' => $this->organizationId ] );
 	}
 
 	private function execute() {
@@ -111,7 +118,7 @@ class Woozoho_Connector_Zoho_API {
 		if ( $return->code == 0 ) {
 			return $return;
 		} else {
-			throw new \Exception( "Zoho Error ({$return->code}) : {$return->message}." );
+			throw new \Exception( "Zoho Error {$this->accessToken} ({$return->code}) : {$return->message}." );
 		}
 		$this->register_api_call();
 	}

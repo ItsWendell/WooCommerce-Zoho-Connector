@@ -37,7 +37,6 @@ class Woozoho_Connector_Activator {
 	 */
 	public static function install() {
 		global $wpdb;
-		//TODO: Don't activate / run plugin if WooCommerce is not active.
 		//TODO: Implement version management for database
 		//TODO: Implement database update scripts (e.x. WooCommerce)
 
@@ -65,6 +64,18 @@ class Woozoho_Connector_Activator {
 
 		} else {
 			Woozoho_Connector_Logger::write_debug( "Install DB", "Table already installed. Moving on." );
+		}
+	}
+
+	public static function deactivate( $dependencies_not_met = false ) {
+		//TODO: Remove database on deactivation
+	}
+
+	public static function activate() {
+		if ( Woozoho_Connector()->check_dependencies() ) {
+			self::check_version();
+		} else {
+			return false;
 		}
 	}
 }

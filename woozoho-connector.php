@@ -4,7 +4,7 @@
  * Plugin Name: Connector for WooCommerce & Zoho
  * Plugin URI: https://digispark.nl/lab/connector-woocommerce-zoho/
  * Description: A feature rich connector that binds & synchronizes WooCommerce to Zoho.
- * Version: 0.6
+ * Version: 0.8.1
  * Author: DigiSpark
  * Author URI: https://digispark.nl/
  * Requires at least: 4.4
@@ -28,7 +28,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 final class Woozoho_Connector {
 
 	protected static $_instance = null;
-	public $version = "0.8";
+	public $version = "0.8.1";
 	/**
 	 * @var Woozoho_Connector_Zoho_Client
 	 */
@@ -44,23 +44,20 @@ final class Woozoho_Connector {
 	protected $loader;
 
 	public function __construct() {
-		require_once dirname( __FILE__ ) . '/includes/class-woozoho-connector-logger.php';
-		if ( ! $this->check_dependencies() ) {
-			Woozoho_Connector_Logger::write_debug( "Plugin", "Dependencies not met!" );
-			wp_die( "WooZoho connector needs WooCommerce installed." );
-
-			return;
-		}
-
 		$this->define_constants();
 		$this->load_dependencies();
 		$this->init();
 	}
 
 	public function check_dependencies() {
-		//TODO: Fix dependencies checks
+		if ( ! class_exists( 'WooCommerce' ) ) {
+			$plugin_admin = new Woozoho_Connector_Admin();
+			$this->loader->add_action( 'admin_notices', $plugin_admin, 'woozoho_woocommerce_error_admin_notice' );
+			$this->loader->run();
+
+			return false;
+		}
 		return true;
-		//in_array( 'woocommerce/woocommerce.php', (array) get_option( 'active_plugins', array() ) );
 	}
 
 	private function define_constants() {
@@ -96,11 +93,13 @@ final class Woozoho_Connector {
 		 */
 
 		//ZohoConnector Core Functionality
-
+		require_once WOOZOHO_ABSPATH . 'includes/class-woozoho-connector-activator.php';
+		require_once WOOZOHO_ABSPATH . 'includes/class-woozoho-connector-logger.php';
 		require_once WOOZOHO_ABSPATH . 'includes/class-woozoho-connector-zoho-cache.php';
 		require_once WOOZOHO_ABSPATH . 'includes/class-woozoho-connector-zoho-api.php';
 		require_once WOOZOHO_ABSPATH . 'includes/class-woozoho-connector-orders-queue.php';
 		require_once WOOZOHO_ABSPATH . 'includes/class-woozoho-connector-zoho-client.php';
+		require_once WOOZOHO_ABSPATH . 'includes/class-woozoho-connector-zoho-importer.php';
 		require_once WOOZOHO_ABSPATH . 'includes/class-woozoho-connector-cronjobs.php';
 
 		/**
@@ -121,15 +120,17 @@ final class Woozoho_Connector {
 	public function init() {
 		$this->load_plugin_textdomain();
 
-		$this->loader    = new Woozoho_Connector_Loader();
-		$this->logger    = new Woozoho_Connector_Logger();
-		$this->client    = new Woozoho_Connector_Zoho_Client();
-		$this->cron_jobs = new Woozoho_Connector_Cronjobs();
+		$this->loader = new Woozoho_Connector_Loader();
+		$this->logger = new Woozoho_Connector_Logger();
 
 		$this->plugin_hooks();
-		$this->intitialize_cron_jobs();
 
-		$this->run();
+		if ( $this->check_dependencies() ) {
+			$this->client    = new Woozoho_Connector_Zoho_Client();
+			$this->cron_jobs = new Woozoho_Connector_Cronjobs();
+			$this->initialize_cron_jobs();
+			$this->run();
+		}
 	}
 
 	/**
@@ -158,9 +159,13 @@ final class Woozoho_Connector {
 		$plugin_basename = plugin_basename( plugin_dir_path( __DIR__ ) . 'woozoho-connector.php' );
 		$this->loader->add_filter( 'plugin_action_links_' . $plugin_basename, $plugin_admin, 'add_action_links' );
 
-		//WooCommerce Bulk Functionality
+		//WooCommerce Bulk Functionality (Orders)
 		$this->loader->add_filter( 'bulk_actions-edit-shop_order', $plugin_admin, 'woocommerce_add_bulk_actions' );
 		$this->loader->add_filter( 'handle_bulk_actions-edit-shop_order', $plugin_admin, 'woocommerce_bulk_action_send_zoho', 10, 3 );
+
+		//WooCommerce Bulk Functionality (Premium)
+		$this->loader->add_filter( 'bulk_actions-edit-product', $plugin_admin, 'add_bulk_actions_product' );
+		$this->loader->add_filter( 'handle_bulk_actions-edit-product', $plugin_admin, 'handle_bulk_actions_product', 10, 3 );
 
 		//WooCommerce Prepare New Order for Push to Zoho
 		$this->loader->add_action( 'woocommerce_new_order', $plugin_admin, 'schedule_order', 20, 1 );
@@ -175,8 +180,10 @@ final class Woozoho_Connector {
 		$this->loader->add_action( 'woozoho_sku_checker', $plugin_admin, 'sku_checker' );
 	}
 
-	private function intitialize_cron_jobs() {
+	private function initialize_cron_jobs() {
 		$isEnabled = Woozoho_Connector::get_option( "cron_orders_enabled" );
+
+
 		if ( $isEnabled ) {
 			if ( ! $this->cron_jobs->is_orders_job_running() ) {
 				$this->cron_jobs->setup_orders_job();
@@ -185,6 +192,7 @@ final class Woozoho_Connector {
 		} else if ( ! $isEnabled && $this->cron_jobs->is_orders_job_running() ) {
 			$this->cron_jobs->stop_orders_job();
 		}
+
 		$this->loader->add_action( 'woozoho_caching', $this->cron_jobs, 'start_caching' );
 	}
 
@@ -223,6 +231,10 @@ final class Woozoho_Connector {
 	 */
 	public function get_version() {
 		return $this->version;
+	}
+
+	public function get_client() {
+		return $this->client;
 	}
 
 	public static function get_option( $option_name ) {

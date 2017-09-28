@@ -395,6 +395,50 @@ class Woozoho_Connector_Admin {
 		}
 	}
 
+	public function woozoho_woocommerce_error_admin_notice() {
+		?>
+        <div class="error">
+            <p><?php _e( 'Connector for WooCommerce & Zoho Books is enabled but not effective. It requires WooCommerce in order to work.', 'woozoho-connector' ); ?></p>
+        </div>
+		<?php
+	}
+
+	public function add_bulk_actions_product( $bulk_actions ) {
+		$bulk_actions['send_product_to_zoho'] = __( 'Send to Zoho Books', 'woozoho-connector' );
+
+		return $bulk_actions;
+	}
+
+	public function handle_bulk_actions_product( $redirect_to, $action, $post_ids ) {
+		if ( $action !== 'send_product_to_zoho' ) {
+			return $redirect_to;
+		}
+
+		$exporter = new Woozoho_Connector_Zoho_Exporter();
+
+		$results = $exporter->export_products( $post_ids );
+
+		$redirect_to = add_query_arg( 'send_product_to_zoho', count( $results["exported_products"] ), $redirect_to );
+
+		$redirect_to = add_query_arg( 'send_product_to_zoho_errors', count( $results["errors"] ), $redirect_to );
+
+		return $redirect_to;
+	}
+
+	function notice_bulk_actions_product() {
+		if ( ! empty( $_REQUEST['send_product_to_zoho'] ) ) {
+			$products_count = intval( $_REQUEST['send_product_to_zoho'] );
+
+			printf(
+				'<div id="message" class="updated fade">' .
+				_n( '%s product successfully pushed.', '%s products are successfully pushed.', $products_count, 'woozoho-connector' )
+				. '</div>',
+				$orders_count
+			);
+		}
+	}
+
+
 	public function create_sales_order( $order_id ) {
 		Woozoho_Connector()->client->create_sales_order( $order_id );
 	}

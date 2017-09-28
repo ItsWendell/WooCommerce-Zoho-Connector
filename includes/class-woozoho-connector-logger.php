@@ -3,12 +3,11 @@
 class Woozoho_Connector_Logger {
 
 	public static function write_debug( $type, $data ) {
-		if ( Woozoho_Connector::get_option( "debugging" ) ) {
-			$multisite = is_multisite() ? "[" . get_bloginfo( 'name' ) . "]" : ( "" ); //Multi-site support.
-			$logfile   = realpath( __DIR__ . '/..' ) . '/debug_log';
-			file_put_contents( $logfile,
-				$multisite . "[" . date( "Y-m-d H:i:s" ) . "] [" . $type . "] " . $data . "\n", FILE_APPEND );
-		}
+		//TODO: Fix debugging setting.
+		$multisite = is_multisite() ? "[" . get_bloginfo( 'name' ) . "]" : ( "" ); //Multi-site support.
+		$logfile   = realpath( __DIR__ . '/..' ) . '/debug_log';
+		file_put_contents( $logfile,
+			$multisite . "[" . date( "Y-m-d H:i:s" ) . "] [" . $type . "] " . $data . "\n", FILE_APPEND );
 	}
 
 }
