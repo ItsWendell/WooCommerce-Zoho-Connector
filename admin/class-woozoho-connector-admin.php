@@ -299,6 +299,30 @@ class Woozoho_Connector_Admin {
 			),
 
 			array(
+				'name'    => __( 'Default item type', 'woozoho-connector' ),
+				'type'    => 'select',
+				'options' => array(
+					'sales'     => __( 'Sales', 'woozoho-connector' ),
+					'inventory' => __( 'Inventory', 'woozoho-connector' )
+				),
+				'default' => 'sales',
+				'desc'    => __( 'Using Zoho Inventory? Or only books?', 'woozoho-connector' ),
+				'id'      => 'wc_zoho_connector_default_item_type'
+			),
+
+			array(
+				'name'    => __( 'Push items including or excluding tax', 'woozoho-connector' ),
+				'type'    => 'select',
+				'options' => array(
+					'including' => __( 'Including tax', 'woozoho-connector' ),
+					'excluding' => __( 'Excluding tax', 'woozoho-connector' )
+				),
+				'default' => 'sales',
+				'desc'    => __( 'Create new items including tax or excluding tax?', 'woozoho-connector' ),
+				'id'      => 'wc_zoho_connector_default_tax_setting'
+			),
+
+			array(
 				'name'    => __( 'Item placeholder SKU', 'woozoho-connector' ),
 				'type'    => 'text',
 				'default' => 'PLACEHOLDER',

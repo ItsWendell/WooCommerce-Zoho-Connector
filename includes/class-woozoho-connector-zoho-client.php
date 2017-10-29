@@ -172,15 +172,25 @@ class Woozoho_Connector_Zoho_Client {
 			return false;
 		}
 
-		$tax_rate = WC_Tax::get_rate_percent( $wc_product->get_tax_class() );
-		$input    = [
+		$tax_rate = current( WC_Tax::get_rates( $wc_product->get_tax_class() ) )["rate"];
+		Woozoho_Connector_Logger::write_debug( "Tax Test 1", $tax_rate, true );
+		$input = [
 			"name"         => $wc_product->get_name(),
-			"rate"         => $wc_product->get_regular_price(),
 			"description"  => $wc_product->get_description(),
 			"sku"          => $wc_product->get_sku(),
-			"tax_id"       => $this->get_tax($tax_rate),
+			"tax_id"       => $this->get_tax( $tax_rate )->tax_id,
 			"product_type" => "goods"
 		];
+
+		$item_type = Woozoho_Connector::get_option( "default_item_type" );
+
+		$input["item_type"] = ( $item_type ) ? $item_type : "sales";
+
+		$default_tax_setting = Woozoho_Connector::get_option( "default_tax_setting" );
+
+		$input["rate"] = ( $default_tax_setting == "excluding" ) ?
+			wc_get_price_excluding_tax( $wc_product ) : wc_get_price_including_tax( $wc_product );
+
 
 		$output = $this->zoho_api->createItem( $input );
 
@@ -190,6 +200,7 @@ class Woozoho_Connector_Zoho_Client {
 			return $output->item;
 		} else {
 			Woozoho_Connector_Logger::write_debug( "Zoho Client", "Something went wrong while creating product: " . $wc_product->get_name() );
+
 			return false;
 		}
 	}
@@ -860,7 +871,7 @@ class Woozoho_Connector_Zoho_Client {
 	}
 
 	/**
-	 * @param $tax_percentage
+	 * @param float $tax_percentage
 	 * @param bool $tax_name
 	 * @param bool $useCaching
 	 * @param bool $checkCaching
@@ -868,11 +879,10 @@ class Woozoho_Connector_Zoho_Client {
 	 * @return bool
 	 */
 	public function get_tax( $tax_percentage, $tax_name = false, $useCaching = true, $checkCaching = false ) {
-		$tax_percentage = (int) $tax_percentage;
-		Woozoho_Connector_Logger::write_debug( "Get Tax", "Input data: Percentage: " . $tax_percentage . " Tax Name: " . $tax_name );
+		//Woozoho_Connector_Logger::write_debug( "Get Tax", "Input data: Percentage: " . $tax_percentage . " Tax Name: " . $tax_name );
 		if ( $useCaching && ( $checkCaching ? $this->get_cache()->checkItemsCache() : true ) && $this->get_cache()->isEnabled() ) { //Check if caching is enabled & valid
 
-			Woozoho_Connector_Logger::write_debug( "Get Tax", "Data 1: Percentage: " . $tax_percentage . " Name" . $tax_name );
+			//Woozoho_Connector_Logger::write_debug( "Get Tax", "Data 1: Percentage: " . $tax_percentage . " Name" . $tax_name );
 			$item = $this->cache->getTax( $tax_percentage, $tax_name );
 			if ( $item ) {
 				return $item;
@@ -920,10 +930,10 @@ class Woozoho_Connector_Zoho_Client {
 	 */
 	public function convert_item( $zohoItem, $storeItem, $quantity = 0 ) {
 		//Get right tax ID
-		Woozoho_Connector_Logger::write_debug( "Tax Fix?", "Class: " . $storeItem->get_tax_class() );
-		Woozoho_Connector_Logger::write_debug( "Tax class output", print_r( $storeItem->get_tax_class(), true ) );
-		Woozoho_Connector_Logger::write_debug( "Taxes output", print_r( $storeItem->get_taxes(), true ) );
-		$tax = $this->get_tax( $zohoItem->tax_percentage );
+		//Woozoho_Connector_Logger::write_debug( "Tax Fix?", "Class: " . $storeItem->tax );
+		//Woozoho_Connector_Logger::write_debug( "Tax class output", print_r( $storeItem->get_tax_class(), true ) );
+		//Woozoho_Connector_Logger::write_debug( "Taxes output", print_r( $storeItem->get_taxes(), true ) );
+		$tax = $this->get_tax( floatval( $zohoItem->tax_percentage ) );
 
 		if ( $tax ) {
 			Woozoho_Connector_Logger::write_debug( "Tax Fix?", "Tax found in cache by percentage." );
@@ -939,7 +949,7 @@ class Woozoho_Connector_Zoho_Client {
 				$zohoItem->rate : $storeItem->get_product()->get_regular_price(),
 			"name"        => $zohoItem->name,
 			"description" => $zohoItem->description,
-			"tax_id"      => 200451000001689003,
+			"tax_id"      => $tax_id,
 			"unit"        => $zohoItem->unit,
 			"quantity"    => ( $quantity != 0 || ! $storeItem ) ?
 				$quantity : $storeItem->get_quantity()

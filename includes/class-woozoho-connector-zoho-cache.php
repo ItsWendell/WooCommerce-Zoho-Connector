@@ -149,13 +149,9 @@ class Woozoho_Connector_Zoho_Cache {
 
 		foreach ( $items as $item ) {
 			if ( $item->sku == $sku ) {
-				//Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Item '$sku' found in cache." );
-
 				return $item;
 			}
 		}
-
-		//Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Item '$sku' not found in cache." );
 
 		return false;
 	}
@@ -163,26 +159,34 @@ class Woozoho_Connector_Zoho_Cache {
 	public function getTax( $tax_percentage, $tax_name = null ) {
 		$taxes = $this->getCachedTaxes();
 
+		Woozoho_Connector_Logger::write_debug( "Tax Cache Count", "Items: " . count( $taxes ) );
+		Woozoho_Connector_Logger::write_debug( "Cache Out", print_r( $taxes, true ) );
 		foreach ( $taxes as $tax ) {
+			Woozoho_Connector_Logger::write_debug( "Tax Check", "Checking $tax_percentage against {$tax->tax_id} @ {$tax->tax_percentage}" );
+			if ( $tax_percentage != false ) {
+				if ( $tax_percentage == floatval( $tax->tax_percentage ) ) {
+					Woozoho_Connector_Logger::write_debug( "Tax Check", "Match!" );
+
+					return $tax;
+				}
+			}
+
 			if ( $tax_name != null ) {
 				if ( $tax->tax_name == $tax_name ) {
 					return $tax;
 				}
 			}
 
-			if ( $tax_percentage != false ) {
-				if ( $tax_percentage == $tax->tax_percentage ) {
-					return $tax;
-				}
-			}
+			Woozoho_Connector_Logger::write_debug( "Tax Check", "No match!" );
 		}
+
 
 		return false;
 	}
 
 	public function getCachedItems() {
 		if ( empty( $this->items_cache ) ) {
-			$cacheData         = json_decode( file_get_contents( WOOZOHO_CACHE_DIR . "items.json" ) );
+			$cacheData         = json_decode( file_get_contents( $this->cacheDir . "items.json" ) );
 			$this->items_cache = $cacheData;
 		} else {
 			$cacheData = $this->items_cache;
@@ -190,9 +194,6 @@ class Woozoho_Connector_Zoho_Cache {
 
 		if ( $cacheData ) {
 			$returnData = $cacheData;
-
-			//Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Items in cache: " . count( $returnData ) );
-
 			return $returnData;
 		} else {
 			return false;
@@ -200,18 +201,14 @@ class Woozoho_Connector_Zoho_Cache {
 	}
 
 	public function getCachedTaxes() {
-		if ( empty( $this->taxes_cache ) ) {
-			$cacheData         = json_decode( file_get_contents( WOOZOHO_CACHE_DIR . "taxes.json" ) );
-			$this->taxes_cache = $cacheData;
-		} else {
-			$cacheData = $this->items_cache;
-		}
+		$cacheData = array();
+
+		$cacheData         = json_decode( file_get_contents( $this->cacheDir . "taxes.json" ) );
+		$this->taxes_cache = $cacheData;
+
 
 		if ( $cacheData ) {
 			$returnData = $cacheData;
-
-			//Woozoho_Connector_Logger::writeDebug( "Zoho Cache", "Items in cache: " . count( $returnData ) );
-
 			return $returnData;
 		} else {
 			return false;

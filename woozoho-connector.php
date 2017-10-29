@@ -4,7 +4,7 @@
  * Plugin Name: Connector for WooCommerce & Zoho
  * Plugin URI: https://digispark.nl/lab/connector-woocommerce-zoho/
  * Description: A feature rich connector that binds & synchronizes WooCommerce to Zoho.
- * Version: 0.8.1
+ * Version: 0.8.5
  * Author: DigiSpark
  * Author URI: https://digispark.nl/
  * Requires at least: 4.4
@@ -28,7 +28,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 final class Woozoho_Connector {
 
 	protected static $_instance = null;
-	public $version = "0.8.1";
+	public $version = "0.8.5";
 	/**
 	 * @var Woozoho_Connector_Zoho_Client
 	 */
