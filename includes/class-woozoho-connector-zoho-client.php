@@ -172,11 +172,12 @@ class Woozoho_Connector_Zoho_Client {
 			return false;
 		}
 
-		$tax_rate = current( WC_Tax::get_rates( $wc_product->get_tax_class() ) )["rate"];
-		Woozoho_Connector_Logger::write_debug( "Tax Test 1", $tax_rate, true );
+
+		$tax_rate = current( WC_Tax::get_base_tax_rates( $wc_product->get_tax_class() ) )["rate"];
+
 		$input = [
 			"name"         => $wc_product->get_name(),
-			"description"  => $wc_product->get_description(),
+			//"description"  => $wc_product->get_description(),
 			"sku"          => $wc_product->get_sku(),
 			"tax_id"       => $this->get_tax( $tax_rate )->tax_id,
 			"product_type" => "goods"
@@ -243,7 +244,7 @@ class Woozoho_Connector_Zoho_Client {
 			"item_id"     => $item->item_id,
 			"rate"        => $shipping_cost,
 			"name"        => $item->name,
-			"description" => $item->description,
+			//"description" => $item->description,
 			"tax_id"      => 200451000001689003,
 			"unit"        => "unit",
 			"quantity"    => 1,
@@ -948,7 +949,7 @@ class Woozoho_Connector_Zoho_Client {
 			"rate"        => ( Woozoho_Connector::get_option( "pricing" ) == "zoho" || ! $storeItem ) ?
 				$zohoItem->rate : $storeItem->get_product()->get_regular_price(),
 			"name"        => $zohoItem->name,
-			"description" => $zohoItem->description,
+			//"description" => $zohoItem->description,
 			"tax_id"      => $tax_id,
 			"unit"        => $zohoItem->unit,
 			"quantity"    => ( $quantity != 0 || ! $storeItem ) ?
